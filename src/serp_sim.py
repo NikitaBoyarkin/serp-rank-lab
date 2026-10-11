@@ -258,14 +258,21 @@ def eta_for_device(device: str, config: SimConfig) -> float:
     return config.eta_mobile if device == "mobile" else config.eta_desktop
 
 
-def revenue_if_engaged(partner: str, price: float) -> float:
+def revenue_if_engaged(
+    partner: str,
+    price: float,
+    partner_by_name: dict[str, dict[str, object]] | None = None,
+) -> float:
     """Expected partner revenue given the offer was clicked.
 
     * CPA: ``commission_rate * price * redirect_rate * book_rate`` (commission
       only lands on a booking).
     * CPC: ``cpc`` (paid on the click itself).
+
+    ``partner_by_name`` overrides the module-level :data:`PARTNERS` mapping; the
+    calibrator uses it to re-anchor the economics without editing this file.
     """
-    p = PARTNER_BY_NAME[partner]
+    p = (partner_by_name or PARTNER_BY_NAME)[partner]
     if p["type"] == "CPA":
         return (
             float(p["commission_rate"]) * price * float(p["redirect_rate"]) * float(p["book_rate"])
@@ -369,14 +376,21 @@ def simulate_serps(
     routes: pd.DataFrame,
     user_ids: np.ndarray | list[str],
     config: SimConfig | None = None,
+    partners: list[dict[str, object]] | None = None,
 ) -> pd.DataFrame:
     """Generate the ``serp_offers`` frame (one row per offer).
 
     Deterministic: one ``numpy`` generator seeded from ``config.seed`` drives
     every random draw, in a fixed order, with stable tie-breaks -- identical
     inputs give identical output.
+
+    ``partners`` defaults to the module-level :data:`PARTNERS`, so the default
+    path is unchanged; a table with the same keys re-anchors the economics.
     """
     config = config or SimConfig()
+    partner_table = PARTNERS if partners is None else list(partners)
+    partner_by_name = {str(p["partner"]): p for p in partner_table}
+    partner_names = np.array([str(p["partner"]) for p in partner_table])
     rng = np.random.default_rng(config.seed)
 
     routes = routes.reset_index(drop=True)
@@ -406,7 +420,7 @@ def simulate_serps(
         n_partners = min(
             int(rng.integers(config.partners_min, config.partners_max + 1)), n_offers - 1
         )
-        partner_pool = rng.choice(PARTNER_NAMES, size=n_partners, replace=False)
+        partner_pool = rng.choice(partner_names, size=n_partners, replace=False)
         offers_partner = [
             str(partner_pool[int(rng.integers(0, n_partners))]) for _ in range(n_offers)
         ]
@@ -414,13 +428,13 @@ def simulate_serps(
         prices = np.array(
             [
                 base_price
-                * float(PARTNER_BY_NAME[p]["price_index"])
+                * float(partner_by_name[p]["price_index"])
                 * float(np.exp(rng.normal(0.0, config.price_sigma)))
                 for p in offers_partner
             ]
         )
         price_ratio = prices / prices.min()
-        affinities = np.array([float(PARTNER_BY_NAME[p]["affinity"]) for p in offers_partner])
+        affinities = np.array([float(partner_by_name[p]["affinity"]) for p in offers_partner])
         logits = (
             config.base_relevance_logit
             + affinities
@@ -429,7 +443,10 @@ def simulate_serps(
         relevance = np.asarray(sigmoid(logits), dtype=float)
 
         rev_potential = np.array(
-            [revenue_if_engaged(p, pr) for p, pr in zip(offers_partner, prices, strict=True)]
+            [
+                revenue_if_engaged(p, pr, partner_by_name)
+                for p, pr in zip(offers_partner, prices, strict=True)
+            ]
         )
 
         # Displayed order = shipped money-leaning blend (documented).
@@ -452,7 +469,7 @@ def simulate_serps(
 
         for pos, oi in enumerate(order, start=1):
             partner = offers_partner[oi]
-            p_conf = PARTNER_BY_NAME[partner]
+            p_conf = partner_by_name[partner]
             p_examine = float(examine[pos - 1])
             p_click = p_examine * float(relevance[oi])
 

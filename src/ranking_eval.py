@@ -64,17 +64,32 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from src.policies import (
+    DEFAULT_POLICIES,
+    DELTA_POLICY,
+    POLICIES,
+    REALISTIC_POLICIES,
+    PolicyContext,
+    context_for,
+    rev_engaged,
+    train_test_split_searches,
+)
 from src.serp_sim import (
     ETA_DESKTOP,
     ETA_MOBILE,
     SERP_OFFERS_PARQUET,
+    SimConfig,
     examination_prob,
-    revenue_if_engaged,
+    load_routes,
+    load_user_ids,
+    simulate_serps,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -202,76 +217,69 @@ def mrr(relevances: np.ndarray | list[float], threshold: float = 0.5) -> float:
 # --------------------------------------------------------------------------- #
 
 
-def _greedy_revenue_ranking(offers: list[dict], eta: float) -> list[dict]:
-    """Greedy slot assignment maximising expected revenue (deterministic ties)."""
-    remaining = sorted(offers, key=lambda o: o["key"])
-    ranked: list[dict] = []
-    for pos in range(1, len(offers) + 1):
-        e = examination_prob(pos, eta)
-        best: dict | None = None
-        best_value = -1.0
-        for offer in remaining:
-            value = e * offer["relevance"] * offer["rev_engaged"]
-            if best is None or value > best_value + 1e-12:
-                best, best_value = offer, value
-        assert best is not None
-        remaining.remove(best)
-        ranked.append(best)
-    return ranked
+def search_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    """One search's offers in logged display order, re-indexed 0..n-1.
 
-
-def _ranking_expected_metrics(ranked: list[dict], eta: float) -> tuple[float, float]:
-    """(expected revenue, expected clicks) for a ranked list under the PBM."""
-    revenue = 0.0
-    clicks = 0.0
-    for pos, offer in enumerate(ranked, start=1):
-        p_click = examination_prob(pos, eta) * offer["relevance"]
-        clicks += p_click
-        revenue += p_click * offer["rev_engaged"]
-    return revenue, clicks
-
-
-def _search_offers(frame: pd.DataFrame) -> list[dict]:
-    """Turn one search's rows into offer dicts with intrinsic relevance."""
-    ordered = frame.sort_values("position")
-    offers = []
-    for key, (rel, partner, price) in enumerate(
-        zip(ordered["relevance"], ordered["partner"], ordered["price"], strict=True)
-    ):
-        offers.append(
-            {
-                "key": key,
-                "relevance": float(rel),
-                "rev_engaged": revenue_if_engaged(str(partner), float(price)),
-            }
-        )
-    return offers
-
-
-def compare_rankings(offers_df: pd.DataFrame, k: int = 10) -> pd.DataFrame:
-    """Headline comparison: relevance-optimal vs revenue-optimal ranking.
-
-    Both policies re-rank the *same* offer set within each search. NDCG@k is the
-    offline metric; expected revenue per search is the online metric. Returns a
-    tidy frame with one row per policy plus a ``delta_relevance_minus_revenue``
-    row (relevance minus revenue).
+    This is the frame the policies rank over: row ``i`` is the offer that was
+    displayed at position ``i + 1``. Re-indexing is what lets a policy return a
+    permutation of ``range(len(frame))``.
     """
-    totals = {
-        "relevance": {"ndcg": 0.0, "revenue": 0.0, "clicks": 0.0},
-        "revenue": {"ndcg": 0.0, "revenue": 0.0, "clicks": 0.0},
-    }
+    return frame.sort_values("position").reset_index(drop=True)
+
+
+def _offer_arrays(frame: pd.DataFrame, ctx: PolicyContext) -> tuple[np.ndarray, np.ndarray]:
+    """Per-row ``(relevance, revenue_if_engaged)`` in logged display order."""
+    return frame["relevance"].to_numpy(dtype=float), rev_engaged(frame, ctx)
+
+
+def _expected_metrics(
+    order: np.ndarray, rel: np.ndarray, rev: np.ndarray, eta: float
+) -> tuple[float, float]:
+    """``(expected revenue, expected clicks)`` for a displayed order under the PBM.
+
+    ``P(click at slot k) = P(examine at k) * relevance``, and revenue lands only
+    if the offer is engaged.
+    """
+    order = np.asarray(order, dtype=int)
+    e = np.array([examination_prob(k, eta) for k in range(1, len(order) + 1)], dtype=float)
+    p_click = e * rel[order]
+    return float((p_click * rev[order]).sum()), float(p_click.sum())
+
+
+def compare_rankings(
+    offers_df: pd.DataFrame,
+    k: int = 10,
+    policies: Sequence[str] | None = None,
+    ctx: PolicyContext | None = None,
+    eta_mobile: float = ETA_MOBILE,
+    eta_desktop: float = ETA_DESKTOP,
+) -> pd.DataFrame:
+    """Policy table: NDCG@k and expected revenue per search, one row per policy.
+
+    Every policy re-ranks the *same* offer set within each search, so the
+    comparison is apples to apples. NDCG@k is the offline metric; expected revenue
+    per search is the online one. A ``delta_relevance_minus_revenue`` row is
+    appended whenever both references are present.
+
+    Defaults to the two Phase 2 reference policies. The realistic rankers are
+    opt-in because they need ``partner_type``/``examine_prob`` columns and fitted
+    coefficients on ``ctx``.
+    """
+    names = tuple(policies) if policies is not None else DEFAULT_POLICIES
+    ctx = ctx or PolicyContext()
+    if (eta_mobile, eta_desktop) != (ctx.eta_mobile, ctx.eta_desktop):
+        ctx = replace(ctx, eta_mobile=eta_mobile, eta_desktop=eta_desktop)
+
+    totals = {name: {"ndcg": 0.0, "revenue": 0.0, "clicks": 0.0} for name in names}
     n_searches = 0
-    for _, frame in offers_df.groupby("search_id", sort=True):
-        device = str(frame["device"].iloc[0])
-        eta = ETA_MOBILE if device == "mobile" else ETA_DESKTOP
-        offers = _search_offers(frame)
-
-        relevance_ranked = sorted(offers, key=lambda o: (-o["relevance"], o["key"]))
-        revenue_ranked = _greedy_revenue_ranking(offers, eta)
-
-        for name, ranked in (("relevance", relevance_ranked), ("revenue", revenue_ranked)):
-            totals[name]["ndcg"] += ndcg_at_k([o["relevance"] for o in ranked], k)
-            revenue, clicks = _ranking_expected_metrics(ranked, eta)
+    for _, group in offers_df.groupby("search_id", sort=True):
+        frame = search_frame(group)
+        eta = ctx.eta(str(frame["device"].iloc[0]))
+        rel, rev = _offer_arrays(frame, ctx)
+        for name in names:
+            order = np.asarray(POLICIES[name](frame, ctx), dtype=int)
+            totals[name]["ndcg"] += ndcg_at_k(rel[order], k)
+            revenue, clicks = _expected_metrics(order, rel, rev, eta)
             totals[name]["revenue"] += revenue
             totals[name]["clicks"] += clicks
         n_searches += 1
@@ -279,28 +287,147 @@ def compare_rankings(offers_df: pd.DataFrame, k: int = 10) -> pd.DataFrame:
     if n_searches == 0:
         raise ValueError("offers_df must contain at least one search")
 
-    rows = []
-    for name in ("relevance", "revenue"):
+    rows = [
+        {
+            "policy": name,
+            "ndcg_at_k": totals[name]["ndcg"] / n_searches,
+            "revenue_per_search": totals[name]["revenue"] / n_searches,
+            "clicks_per_search": totals[name]["clicks"] / n_searches,
+        }
+        for name in names
+    ]
+    if "relevance" in names and "revenue" in names:
         rows.append(
             {
-                "policy": name,
-                "ndcg_at_k": totals[name]["ndcg"] / n_searches,
-                "revenue_per_search": totals[name]["revenue"] / n_searches,
-                "clicks_per_search": totals[name]["clicks"] / n_searches,
+                "policy": DELTA_POLICY,
+                "ndcg_at_k": (totals["relevance"]["ndcg"] - totals["revenue"]["ndcg"]) / n_searches,
+                "revenue_per_search": (
+                    totals["relevance"]["revenue"] - totals["revenue"]["revenue"]
+                )
+                / n_searches,
+                "clicks_per_search": (totals["relevance"]["clicks"] - totals["revenue"]["clicks"])
+                / n_searches,
             }
         )
-    rows.append(
-        {
-            "policy": "delta_relevance_minus_revenue",
-            "ndcg_at_k": totals["relevance"]["ndcg"] / n_searches
-            - totals["revenue"]["ndcg"] / n_searches,
-            "revenue_per_search": totals["relevance"]["revenue"] / n_searches
-            - totals["revenue"]["revenue"] / n_searches,
-            "clicks_per_search": totals["relevance"]["clicks"] / n_searches
-            - totals["revenue"]["clicks"] / n_searches,
-        }
-    )
     return pd.DataFrame(rows)
+
+
+# --------------------------------------------------------------------------- #
+# Sensitivity of the divergence to the model's own parameters
+# --------------------------------------------------------------------------- #
+
+ETA_GRID = (0.6, 0.8, 1.0, 1.2, 1.4, 1.6)
+TILT_GRID = (0.0, 0.25, 0.5, 0.75, 1.0)
+SWEEP_SEARCHES = 2000
+
+
+def _sample_searches(offers_df: pd.DataFrame, n_searches: int, seed: int) -> pd.DataFrame:
+    """Deterministic random subset of whole searches -- never a partial SERP."""
+    ids = np.array(sorted(offers_df["search_id"].unique()))
+    if len(ids) <= n_searches:
+        return offers_df
+    rng = np.random.default_rng(seed)
+    picked = set(rng.choice(ids, size=n_searches, replace=False).tolist())
+    return offers_df[offers_df["search_id"].isin(picked)]
+
+
+def sensitivity_sweep(
+    offers_df: pd.DataFrame,
+    k: int = 10,
+    ctx: PolicyContext | None = None,
+    eta_grid: Sequence[float] = ETA_GRID,
+    tilt_grid: Sequence[float] = TILT_GRID,
+    n_searches: int = SWEEP_SEARCHES,
+    seed: int = 0,
+    routes: pd.DataFrame | None = None,
+    user_ids: np.ndarray | list[str] | None = None,
+) -> dict[str, object]:
+    """Ask whether the divergence is an artefact of the simulator's own knobs.
+
+    Two axes, because there are two candidate explanations:
+
+    * ``eta`` -- the examination curve. Re-scored on the *same* offers, so if the
+      gap were a property of the curve, some point on the grid would close it.
+      Both device curves are set to the same value, making the axis one number.
+    * ``money_tilt`` -- the shipped display blend. This one cannot be re-scored in
+      place: it decides which offers were ever displayed, so the SERPs must be
+      regenerated. What it changes is the *logged* order, so this axis reports how
+      the shipped blend itself trades NDCG against revenue.
+
+    The verdict is either an eta band where the gap survives, or an explicit
+    "does not vanish on this grid".
+    """
+    ctx = ctx or PolicyContext()
+    sub = _sample_searches(offers_df, n_searches, seed)
+    n_used = int(sub["search_id"].nunique())
+
+    eta_rows: list[dict[str, object]] = []
+    for eta in eta_grid:
+        table = compare_rankings(
+            sub,
+            k=k,
+            policies=("relevance", "revenue"),
+            ctx=ctx,
+            eta_mobile=float(eta),
+            eta_desktop=float(eta),
+        ).set_index("policy")
+        delta_ndcg = float(table.loc[DELTA_POLICY, "ndcg_at_k"])
+        delta_rev = float(table.loc[DELTA_POLICY, "revenue_per_search"])
+        eta_rows.append(
+            {
+                "eta": float(eta),
+                "ndcg_delta": delta_ndcg,
+                "revenue_delta": delta_rev,
+                "divergence_holds": bool(delta_ndcg > 0 and delta_rev < 0),
+            }
+        )
+
+    surviving = [float(row["eta"]) for row in eta_rows if row["divergence_holds"]]
+    if len(surviving) == len(eta_rows):
+        verdict = (
+            f"does not vanish on eta in [{min(eta_grid)}, {max(eta_grid)}]: NDCG rises "
+            "while revenue falls at every grid point"
+        )
+    elif surviving:
+        verdict = (
+            f"holds only for eta in [{min(surviving)}, {max(surviving)}]; "
+            f"vanishes outside that band (grid {list(eta_grid)})"
+        )
+    else:
+        verdict = "vanishes across the whole eta grid"
+
+    tilt_rows: list[dict[str, object]] = []
+    if routes is not None and user_ids is not None:
+        for tilt in tilt_grid:
+            sim = simulate_serps(
+                routes, user_ids, SimConfig(n_searches=n_searches, money_tilt=float(tilt))
+            )
+            ndcg_sum = 0.0
+            rev_sum = 0.0
+            count = 0
+            for _, group in sim.groupby("search_id", sort=True):
+                frame = search_frame(group)
+                eta = ctx.eta(str(frame["device"].iloc[0]))
+                rel, rev = _offer_arrays(frame, ctx)
+                ndcg_sum += ndcg_at_k(rel, k)
+                revenue, _clicks = _expected_metrics(np.arange(len(frame)), rel, rev, eta)
+                rev_sum += revenue
+                count += 1
+            tilt_rows.append(
+                {
+                    "money_tilt": float(tilt),
+                    "logged_ndcg_at_k": ndcg_sum / count,
+                    "logged_revenue_per_search": rev_sum / count,
+                }
+            )
+
+    return {
+        "k": k,
+        "n_searches": n_used,
+        "eta": eta_rows,
+        "money_tilt": tilt_rows,
+        "verdict": verdict,
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -428,7 +555,27 @@ def main(argv: list[str] | None = None) -> int:
     print(f"offers:    {len(offers):,}   searches: {offers['search_id'].nunique():,}")
     print(f"NDCG cutoff k = {args.k}\n")
 
-    summary = compare_rankings(offers, k=args.k)
+    # A fitted ranker must not be scored on the searches it learned from, so the
+    # split is on ``search_id``: fit on one half, score every policy on the other.
+    train, test = train_test_split_searches(offers, test_frac=0.5, seed=0)
+    ctx = context_for(test, train=train)
+    print(
+        f"train searches: {train['search_id'].nunique():,}   "
+        f"test searches:  {test['search_id'].nunique():,}"
+    )
+    for name, beta in ctx.params.items():
+        beta = np.asarray(beta, dtype=float)
+        note = "position-biased fit" if name == "click_trained" else "IPW fit"
+        print(f"  {name:<20} price={beta[1]:+.3f}  cpc={beta[2]:+.3f}   ({note})")
+    print()
+
+    summary = compare_rankings(test, k=args.k, policies=POLICIES, ctx=ctx)
+    by_policy = summary.set_index("policy")
+
+    def cell(name: str, column: str) -> float:
+        """Key-based lookup -- never ``.loc[i]``, so adding a policy cannot renumber."""
+        return float(by_policy.loc[name, column])
+
     logged_revenue = float(offers.groupby("search_id")["commission"].sum().mean())
 
     # --- IPW / propensity demonstration on the logged clicks ---
@@ -443,37 +590,61 @@ def main(argv: list[str] | None = None) -> int:
     true_rel = float(offers["relevance"].mean())
 
     # --- interleaving decision vs the shipped revenue-leaning display ---
-    first_search = offers["search_id"].iloc[0]
-    frame = offers[offers["search_id"] == first_search]
-    device = str(frame["device"].iloc[0])
-    eta_dev = ETA_MOBILE if device == "mobile" else ETA_DESKTOP
-    keys = list(range(len(frame)))
-    rel_map = {i: float(r) for i, r in enumerate(frame.sort_values("position")["relevance"])}
-    by_rel = sorted(keys, key=lambda i: (-rel_map[i], i))
-    offer_dicts = _search_offers(frame)
-    by_rev = [o["key"] for o in _greedy_revenue_ranking(offer_dicts, eta_dev)]
+    first_search = test["search_id"].iloc[0]
+    frame = search_frame(test[test["search_id"] == first_search])
+    eta_dev = ctx.eta(str(frame["device"].iloc[0]))
+    rel_map = {i: float(r) for i, r in enumerate(frame["relevance"])}
+    by_rel = [int(i) for i in POLICIES["relevance"](frame, ctx)]
+    by_rev = [int(i) for i in POLICIES["revenue"](frame, ctx)]
     inter = interleaving_experiment(by_rel, by_rev, rel_map, eta_dev)
 
     divergence = {
         "ndcg_k": args.k,
-        "ndcg_relevance": float(summary.loc[0, "ndcg_at_k"]),
-        "ndcg_revenue": float(summary.loc[1, "ndcg_at_k"]),
-        "revenue_per_search_relevance": float(summary.loc[0, "revenue_per_search"]),
-        "revenue_per_search_revenue": float(summary.loc[1, "revenue_per_search"]),
-        "ndcg_delta": float(summary.loc[2, "ndcg_at_k"]),
-        "revenue_delta": float(summary.loc[2, "revenue_per_search"]),
+        "ndcg_relevance": cell("relevance", "ndcg_at_k"),
+        "ndcg_revenue": cell("revenue", "ndcg_at_k"),
+        "revenue_per_search_relevance": cell("relevance", "revenue_per_search"),
+        "revenue_per_search_revenue": cell("revenue", "revenue_per_search"),
+        "ndcg_delta": cell(DELTA_POLICY, "ndcg_at_k"),
+        "revenue_delta": cell(DELTA_POLICY, "revenue_per_search"),
         "ndcg_rises_while_revenue_falls": bool(
-            summary.loc[2, "ndcg_at_k"] > 0 and summary.loc[2, "revenue_per_search"] < 0
+            cell(DELTA_POLICY, "ndcg_at_k") > 0 and cell(DELTA_POLICY, "revenue_per_search") < 0
         ),
     }
+
+    # The point of the realistic rankers: the divergence is not an artefact of
+    # comparing the oracle with the greedy optimum.
+    realistic = [
+        {
+            "policy": name,
+            "ndcg_at_k": cell(name, "ndcg_at_k"),
+            "revenue_per_search": cell(name, "revenue_per_search"),
+            "ndcg_below_oracle": bool(cell(name, "ndcg_at_k") < divergence["ndcg_relevance"]),
+        }
+        for name in REALISTIC_POLICIES
+    ]
+
+    try:
+        sensitivity = sensitivity_sweep(
+            offers, k=args.k, ctx=ctx, routes=load_routes(), user_ids=load_user_ids()
+        )
+        tilt_note = ""
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        # Routes/users are only needed to regenerate SERPs for the tilt axis;
+        # without them the eta axis still runs.
+        sensitivity = sensitivity_sweep(offers, k=args.k, ctx=ctx)
+        tilt_note = f"money_tilt axis skipped ({type(exc).__name__}: {exc})"
 
     report = {
         "k": args.k,
         "offers": int(len(offers)),
         "searches": int(offers["search_id"].nunique()),
+        "train_searches": int(train["search_id"].nunique()),
+        "test_searches": int(test["search_id"].nunique()),
         "logged_revenue_per_search": logged_revenue,
         "policies": summary.to_dict(orient="records"),
         "divergence": divergence,
+        "realistic_policies": realistic,
+        "sensitivity": sensitivity,
         "ctr": {
             "naive": naive,
             "true_position_free": true_rel,
@@ -497,7 +668,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"IPW-corrected (EM estimate): {corrected_em:.4f}")
     print(f"true position-free CTR:    {true_rel:.4f}  (mean intrinsic relevance)")
     print()
-    print("--- headline divergence ---")
+    print("--- reference divergence (both policies see ground truth) ---")
     print(
         f"relevance policy:  NDCG@{args.k}={divergence['ndcg_relevance']:.4f}  "
         f"revenue/search={divergence['revenue_per_search_relevance']:,.2f}"
@@ -511,6 +682,29 @@ def main(argv: list[str] | None = None) -> int:
         f"revenue {divergence['revenue_delta']:+,.2f}/search"
     )
     print(f"NDCG rises while revenue falls: {divergence['ndcg_rises_while_revenue_falls']}")
+    print()
+    print("--- realistic policies (no access to the relevance column) ---")
+    for row in realistic:
+        print(
+            f"{row['policy']:<20} NDCG@{args.k}={row['ndcg_at_k']:.4f}  "
+            f"revenue/search={row['revenue_per_search']:,.2f}"
+        )
+    print()
+    print("--- does the divergence survive the model's own parameters? ---")
+    for row in sensitivity["eta"]:
+        print(
+            f"eta={row['eta']:.2f}  NDCG delta={row['ndcg_delta']:+.4f}  "
+            f"revenue delta={row['revenue_delta']:+,.2f}  holds={row['divergence_holds']}"
+        )
+    print(f"verdict: {sensitivity['verdict']}")
+    if tilt_note:
+        print(tilt_note)
+    for row in sensitivity["money_tilt"]:
+        print(
+            f"shipped tilt={row['money_tilt']:.2f}  logged NDCG@{args.k}="
+            f"{row['logged_ndcg_at_k']:.4f}  "
+            f"logged revenue/search={row['logged_revenue_per_search']:,.2f}"
+        )
     print()
     print(
         f"interleaving ({inter['users']} users, first SERP): decision={inter['decision']} "
