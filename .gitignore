@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+
+# Raw third-party data is never committed; only the loader is.
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*.parquet
+
+reports/*.png
+reports/*.json

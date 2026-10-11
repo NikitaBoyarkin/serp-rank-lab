@@ -1,0 +1,29 @@
+[project]
+name = "serp-rank-lab"
+version = "0.1.0"
+description = "Flight-metasearch SERP analytics lab: ranking, monetisation and funnel analysis of search results pages."
+requires-python = ">=3.10"
+dependencies = [
+    "duckdb>=1.0",
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "pyarrow>=17",
+    "matplotlib>=3.8",
+    "scipy>=1.11",
+    "streamlit>=1.36",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
