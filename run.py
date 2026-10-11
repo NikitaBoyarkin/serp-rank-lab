@@ -11,7 +11,10 @@ Stage -> module
 ``eval``        alias of ``rank``     -- the requested CLI surface names both; they
                                         run the same ranking-evaluation module
 ``experiment``  ``src.experiment``    -- ``reports/experiment.json`` + ``reports/peeking.png``
-``all``         the five real stages, in dependency order
+``sql``         ``src.sql_stage``     -- ``sql/03``+``04`` -> ``data/processed/<view>.parquet``
+``business``    ``src.business``      -- real islands + clickstream -> ``reports/business.json``
+                                        + ``reports/figures/*.png``
+``all``         every stage, in dependency order
 
 ``src/sessions.py`` exposes ``build_sessions`` but no ``main()``; the ``sessions``
 stage wires it here (events -> ``sessions.parquet``) rather than editing the
@@ -34,10 +37,12 @@ _STAGE_MODULE = {
     "rank": "src.ranking_eval",
     "eval": "src.ranking_eval",
     "experiment": "src.experiment",
+    "sql": "src.sql_stage",
+    "business": "src.business",
 }
 
 # Dependency order for ``all`` (``eval`` is an alias, so it is not repeated).
-_ALL_ORDER = ["ingest", "sessions", "serp", "rank", "experiment"]
+_ALL_ORDER = ["ingest", "sessions", "serp", "sql", "rank", "experiment", "business"]
 
 
 def _run_sessions() -> int:
