@@ -12,3 +12,4 @@ data/processed/*.parquet
 
 reports/*.png
 reports/*.json
+!reports/peeking.png
