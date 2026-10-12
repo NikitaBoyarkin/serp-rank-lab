@@ -107,6 +107,36 @@ def plot_ranking_divergence(ranking_report: dict):
     return fig
 
 
+def plot_sensitivity_sweep(ranking_report: dict):
+    """Divergence robustness: a money-tilt sweep and a position-bias-strength sweep."""
+    tilt = pd.DataFrame(ranking_report["sensitivity"]["money_tilt"])
+    eta = pd.DataFrame(ranking_report["sensitivity"]["eta"])
+    fig, axes = plt.subplots(1, 2, figsize=(10, 3.6))
+
+    axes[0].plot(tilt["money_tilt"], tilt["logged_ndcg_at_k"], marker="o")
+    axes[0].set_xlabel("money tilt")
+    axes[0].set_ylabel("NDCG@10")
+    axes[0].set_title("Money tilt: NDCG falls while revenue rises")
+    tilt_axis = axes[0].twinx()
+    tilt_axis.plot(
+        tilt["money_tilt"],
+        tilt["logged_revenue_per_search"],
+        marker="s",
+        color="tab:red",
+    )
+    tilt_axis.set_ylabel("revenue / search")
+
+    axes[1].bar(eta["eta"].astype(str), eta["revenue_delta"], color="tab:red")
+    axes[1].set_xlabel("eta (position-bias strength)")
+    axes[1].set_ylabel("revenue delta / search")
+    axes[1].set_title("Eta sweep: the gap keeps its sign")
+    eta_axis = axes[1].twinx()
+    eta_axis.plot(eta["eta"].astype(str), eta["ndcg_delta"], marker="o", color="tab:green")
+    eta_axis.set_ylim(0, float(eta["ndcg_delta"].max()) * 4)
+    eta_axis.set_ylabel("NDCG delta")
+    return fig
+
+
 def plot_cumulative_share(revenue_by_position_df: pd.DataFrame):
     """Cumulative revenue share against position."""
     fig, ax = plt.subplots(figsize=(7, 3.6))
@@ -231,6 +261,8 @@ def save_all(**frames) -> list[Path]:
         jobs.append((plot_partner_quadrant(partner), "partner_quadrant"))
     if ranking is not None:
         jobs.append((plot_ranking_divergence(ranking), "ranking_divergence"))
+    if ranking is not None and "sensitivity" in ranking:
+        jobs.append((plot_sensitivity_sweep(ranking), "sensitivity_sweep"))
     if revenue is not None:
         jobs.append((plot_cumulative_share(revenue), "cumulative_revenue_share"))
     if orders is not None:

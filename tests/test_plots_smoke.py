@@ -26,6 +26,7 @@ from src.plots import (
     plot_refund_rate,
     plot_routes,
     plot_seasonality,
+    plot_sensitivity_sweep,
     save_all,
     save_figure,
 )
@@ -74,6 +75,19 @@ def _ranking_report() -> dict:
             {"policy": "relevance", "ndcg_at_k": 1.0, "revenue_per_search": 869.5},
             {"policy": "revenue", "ndcg_at_k": 0.93, "revenue_per_search": 1193.7},
         ]
+    }
+
+
+def _sensitivity() -> dict:
+    return {
+        "eta": [
+            {"eta": 0.6, "ndcg_delta": 0.069, "revenue_delta": -309.7, "divergence_holds": True},
+            {"eta": 1.6, "ndcg_delta": 0.069, "revenue_delta": -305.3, "divergence_holds": True},
+        ],
+        "money_tilt": [
+            {"money_tilt": 0.0, "logged_ndcg_at_k": 1.0, "logged_revenue_per_search": 901.2},
+            {"money_tilt": 1.0, "logged_ndcg_at_k": 0.913, "logged_revenue_per_search": 1196.4},
+        ],
     }
 
 
@@ -139,6 +153,10 @@ def test_plot_ranking_divergence_returns_figure():
     _check(plot_ranking_divergence(_ranking_report()))
 
 
+def test_plot_sensitivity_sweep_returns_figure():
+    _check(plot_sensitivity_sweep(_ranking_report() | {"sensitivity": _sensitivity()}))
+
+
 def test_plot_cumulative_share_returns_figure():
     _check(plot_cumulative_share(_revenue_by_position()))
 
@@ -191,6 +209,16 @@ def test_save_all_skips_missing_inputs_and_writes_present_ones(tmp_path, monkeyp
 def test_save_all_with_no_inputs_returns_empty(tmp_path, monkeypatch):
     monkeypatch.setattr(plots, "FIGURES_DIR", tmp_path)
     assert save_all() == []
+
+
+def test_save_all_writes_sweep_only_when_sensitivity_present(tmp_path, monkeypatch):
+    monkeypatch.setattr(plots, "FIGURES_DIR", tmp_path)
+    plain = {p.name for p in save_all(ranking_report=_ranking_report())}
+    assert "sensitivity_sweep.png" not in plain
+
+    report = _ranking_report() | {"sensitivity": _sensitivity()}
+    swept = {p.name for p in save_all(ranking_report=report)}
+    assert "sensitivity_sweep.png" in swept
 
 
 @pytest.mark.parametrize("name", ["position_bias", "orders_mix"])

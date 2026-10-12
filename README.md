@@ -1,72 +1,76 @@
 # SERP Rank Lab
 
-A flight-metasearch **search-results-page** analytics lab: ranking, position bias,
-partner monetisation and A/B readout for the surface where a metasearch product
-actually earns.
+Лаборатория аналитики **страницы результатов поиска** в метапоиске авиабилетов:
+ранжирование, смещение позиции, монетизация партнёров и ридаут A/B-теста — на той
+поверхности, где метапоиск действительно зарабатывает.
 
-A metasearch site sells no tickets. Its revenue is a partner commission (CPA per
-booking) or a cost-per-click, multiplied by **which position** the offer occupied
-on the results page. So the two questions that dominate the role are:
+Метапоиск не продаёт билеты. Его выручка — комиссия партнёра (CPA за бронь) или
+плата за клик, умноженная на **позицию**, которую предложение заняло на странице
+результатов. Поэтому роль определяют два вопроса:
 
-1. **Ranking** — which offer deserves which position, and how deep do users
-   actually scroll before they convert?
-2. **Monetisation** — which partners and which positions earn their slot, and how
-   much revenue does a given ranking policy produce per search?
+1. **Ранжирование** — какое предложение достойно какой позиции и до какой глубины
+   пользователь вообще долистывает перед покупкой?
+2. **Монетизация** — какие партнёры и какие позиции отрабатывают свой слот и
+   сколько выручки приносит конкретная политика ранжирования на один поиск?
 
-This lab builds the measurement substrate for both, then runs the experiment
-machinery on top of it.
+Лаборатория сначала строит измерительную основу для обоих вопросов, а затем
+прогоняет на ней машинерию эксперимента.
 
-## Navigation
+## Навигация
 
-- [What it does](#what-it-does)
-- [How the pipeline fits together](#how-the-pipeline-fits-together)
-- [Results](#results)
-  - [Ranking: the offline metric and the money disagree](#ranking-the-offline-metric-and-the-money-disagree)
-  - [Position bias is real and correctable](#position-bias-is-real-and-correctable)
-  - [Funnel and revenue decay down the page](#funnel-and-revenue-decay-down-the-page)
-  - [Which partners earn their slot](#which-partners-earn-their-slot)
-  - [Experiment readout](#experiment-readout)
-  - [Required sample size](#required-sample-size)
-  - [Measured islands: orders, supply and routes](#measured-islands-orders-supply-and-routes)
-- [Data](#data)
-- [Methods](#methods)
-- [Quick start](#quick-start)
-- [Status](#status)
-- [Layout](#layout)
-- [Provenance](#provenance)
-- [Related](#related)
+- [Что делает](#что-делает)
+- [Как устроен пайплайн](#как-устроен-пайплайн)
+- [Результаты](#результаты)
+  - [Ранжирование: офлайн-метрика и деньги расходятся](#ранжирование-офлайн-метрика-и-деньги-расходятся)
+  - [Дивергенция не артефакт одной кривой](#дивергенция-не-артефакт-одной-кривой)
+  - [Смещение позиции реально и корректируется](#смещение-позиции-реально-и-корректируется)
+  - [Воронка и затухание выручки по позициям](#воронка-и-затухание-выручки-по-позициям)
+  - [Какие партнёры оправдывают слот](#какие-партнёры-оправдывают-слот)
+  - [Ридаут эксперимента](#ридаут-эксперимента)
+  - [Необходимый размер выборки](#необходимый-размер-выборки)
+  - [Измеренные острова: заказы, предложение, маршруты](#измеренные-острова-заказы-предложение-маршруты)
+- [Выводы](#выводы)
+- [Рекомендации](#рекомендации)
+- [Данные](#данные)
+- [Методы](#методы)
+- [Быстрый старт](#быстрый-старт)
+- [Статус](#статус)
+- [Структура](#структура)
+- [Происхождение](#происхождение)
+- [Связанное](#связанное)
 
-## What it does
+## Что делает
 
-| Layer | Files | Role |
+| Слой | Файлы | Роль |
 |---|---|---|
-| Data | `src/data_ingest.py`, `sql/01_normalize.sql` | booking feed → one row per flight leg; orders; raw events |
-| Sessions | `src/sessions.py`, `sql/02_sessions.sql` | 30-minute inactivity + date-boundary session rule |
-| SERP | `src/serp_sim.py` | synthetic results pages over **real** route/price pairs; position-bias click model; CPA/CPC partner economics |
-| Evaluation | `src/ranking_eval.py`, `sql/03_funnel.sql`, `sql/04_revenue_per_search.sql` | unbiased CTR, NDCG/MRR, interleaving, revenue per search |
-| Experiment | `src/stats.py`, `src/experiment.py` | SRM, A/A, delta method, CUPED, mSPRT, peeking |
-| Surface | `app.py`, `run.py` | Streamlit dashboard; single pipeline entry point |
+| Данные | `src/data_ingest.py`, `sql/01_normalize.sql` | лента броней → одна строка на сегмент перелёта; заказы; сырые события |
+| Сессии | `src/sessions.py`, `sql/02_sessions.sql` | правило сессии: 30 минут неактивности + граница суток |
+| SERP | `src/serp_sim.py`, `src/calibration.py` | синтетические страницы результатов на **реальных** парах маршрут/цена; клик-модель со смещением позиции; экономика партнёров CPA/CPC |
+| Политики | `src/policies.py` | оракульные и «боевые» ранжировщики: `price_asc`, `click_trained`, `propensity_logistic` |
+| Оценка | `src/ranking_eval.py`, `sql/03_funnel.sql`, `sql/04_revenue_per_search.sql` | несмещённый CTR, NDCG/MRR, interleaving, выручка на поиск |
+| Эксперимент | `src/stats.py`, `src/experiment.py` | SRM, A/A, дельта-метод, CUPED, mSPRT, подглядывание |
+| Поверхность | `app.py`, `run.py` | дашборд на Streamlit; единая точка входа пайплайна |
 
-## How the pipeline fits together
+## Как устроен пайплайн
 
-Every stage reads from and writes to `data/processed/` as Parquet, so any stage
-can be re-run on its own. The **modeled** branch (synthetic SERP over real users)
-and the **measured** branch (real feeds) never fuse — see
-`docs/adr/0001-modeled-vs-measured.md`.
+Каждая стадия читает и пишет `data/processed/` в формате Parquet, поэтому любую
+стадию можно перезапустить отдельно. **Смоделированная** ветка (синтетический SERP
+поверх реальных пользователей) и **измеренная** (реальные ленты) никогда не
+сливаются — см. `docs/adr/0001-modeled-vs-measured.md`.
 
 ```mermaid
 flowchart TD
-    RAW["data/raw/<br/>real feeds (not committed)"]
+    RAW["data/raw/<br/>реальные ленты (не в репозитории)"]
 
     RAW -->|ingest| FOUND["bookings_legs · orders · events"]
     FOUND -->|sessions| SESS["sessions"]
     FOUND -->|business| BIZ["business.json<br/>reports/figures/*.png"]
-    FOUND -->|serp| OFFERS["serp_offers<br/>(modeled, real user_id)"]
+    FOUND -->|serp| OFFERS["serp_offers<br/>(модель, реальный user_id)"]
     OFFERS -->|sql| VIEWS["funnel · revenue_per_search"]
     OFFERS -->|rank| RANK["ranking_eval.json"]
     OFFERS -->|experiment| EXP["experiment.json<br/>peeking.png"]
 
-    VIEWS --> DASH["app.py<br/>Streamlit dashboard"]
+    VIEWS --> DASH["app.py<br/>дашборд Streamlit"]
     RANK --> DASH
     EXP --> DASH
     BIZ --> DASH
@@ -76,70 +80,104 @@ flowchart TD
 uv run python run.py --stage all      # ingest → sessions → serp → sql → rank → experiment → business
 ```
 
-## Results
+## Результаты
 
-All numbers below are reproducible from a fixed seed (`uv run python run.py --stage all`).
-Charts live in `reports/figures/` and are regenerated by the pipeline.
+Все числа ниже воспроизводятся с фиксированным сидом (`uv run python run.py --stage all`).
+Графики лежат в `reports/figures/` и перерисовываются пайплайном.
 
-### Ranking: the offline metric and the money disagree
+### Ранжирование: офлайн-метрика и деньги расходятся
 
-![NDCG@10 and revenue per search by ranking policy, showing NDCG and revenue pointing in opposite directions](reports/figures/ranking_divergence.png)
+![NDCG@10 и выручка на поиск по политикам ранжирования: метрики смотрят в противоположные стороны](reports/figures/ranking_divergence.png)
 
-| Policy | NDCG@10 | Revenue / search | Clicks / search |
-|---|---|---|---|
-| Relevance-first | **1.000** | 869.5 | 1.763 |
-| Revenue-first | 0.931 | **1,193.7** | 1.596 |
-| Δ (relevance − revenue) | **+0.069** | **−324.2** | +0.168 |
+| Политика | Что видит | NDCG@10 | Выручка / поиск | Клики / поиск |
+|---|---|---|---|---|
+| `relevance` (оракул) | релевантность | **1.000** | 868.9 | **1.760** |
+| `revenue` (оракул) | комиссию | 0.932 | **1,196.6** | 1.592 |
+| `price_asc` | только цену | 0.985 | 843.9 | 1.723 |
+| `click_trained` | сырые логи кликов | 0.982 | 693.0 | 1.713 |
+| `propensity_logistic` | логи, взвешенные IPW | 0.985 | 826.6 | 1.722 |
+| Δ (`relevance` − `revenue`) | — | **+0.068** | **−327.7** | +0.168 |
 
-Ranking by relevance maximises NDCG *and* clicks, while ranking by revenue earns
-**38% more per search**. Optimising the offline metric would have shipped the
-worse policy — which is exactly why the ranking team's north star has to be a
-revenue-per-search ratio metric, not an offline relevance score.
+Первая пара — оракулы: они видят эталонную релевантность симулятора, поэтому к ним
+можно было бы отнестись как к «сравнили идеальное с жадным». Три нижние политики —
+те, что команда реально может выкатить: они релевантности не видят (это проверяет
+`tests/test_policies.py`), и на них дивергенция держится.
 
-> **Takeaway.** The two left-panel and right-panel bars move in opposite
-> directions on the same policies. An offline-metric-only release gate would have
-> picked the policy that loses ~324 in commission per search.
+Ранжирование по релевантности максимизирует NDCG *и* клики, а ранжирование по
+комиссии зарабатывает **на 38% больше на поиск**. Оптимизация офлайн-метрики
+выпустила бы в прод худшую политику — именно поэтому северной звездой команды
+ранжирования должна быть выручка на поиск, а не офлайн-скор релевантности.
 
-### Position bias is real and correctable
+Отдельно стоит пара `click_trained` против `propensity_logistic`: это один и тот же
+фиттер, различие только в весах обучающей выборки. Корректировка смещения позиции в
+обучающем сигнале даёт **+19.3% выручки** (826.6 против 693.0) и попутно более
+высокий NDCG — то есть улучшение достаётся бесплатно.
 
-![Mean examination probability by position, mobile versus desktop](reports/figures/position_bias.png)
+> **Что это значит.** Столбики метрики и денег на одних и тех же политиках едут в
+> разные стороны. Релизный гейт, смотрящий только на офлайн-метрику, выбрал бы
+> политику, теряющую ~328 единиц комиссии на каждый поиск.
 
-| Quantity | Value |
+### Дивергенция не артефакт одной кривой
+
+![Money-tilt sweep: NDCG падает, выручка растёт; eta-sweep: зазор сохраняет знак](reports/figures/sensitivity_sweep.png)
+
+Главный результат защищён от очевидного возражения — «это следствие конкретной
+кривой осмотра». Два свипа:
+
+| Свип | Сетка | Что происходит |
+|---|---|---|
+| Сила смещения позиции | η ∈ {0.6, 0.8, 1.0, 1.2, 1.4, 1.6} | ΔNDCG = **+0.069** на каждой точке, Δвыручки = −309.7 … −330.1 — знак не меняется |
+| Наклон к деньгам | `money_tilt` ∈ [0, 1] | NDCG падает 1.000 → 0.913, выручка растёт 901.2 → 1,196.4 — монотонно в противоположные стороны |
+
+Вердикт свипа: дивергенция **не исчезает** на η ∈ [0.6, 1.6]. ΔNDCG вообще не зависит
+от η — порядок, построенный по релевантности, от кривой осмотра не меняется, — а
+денежный разрыв колеблется в пределах ~8% и ни разу не подходит к нулю.
+
+> **Что это значит.** Расхождение метрики и выручки — свойство постановки, а не
+> подобранного параметра. Свип по наклону к деньгам показывает то же самое в
+> непрерывном виде: это один и тот же компромисс, который вы двигаете ручкой, а не
+> два разных мира.
+
+### Смещение позиции реально и корректируется
+
+![Средняя вероятность осмотра по позиции, мобильные против десктопа](reports/figures/position_bias.png)
+
+| Величина | Значение |
 |---|---|
-| Naive CTR (clicks / impressions) | 0.163 |
-| True position-free CTR | 0.629 |
-| IPW-corrected, known examination curve | 0.625 |
-| IPW-corrected, curve estimated by EM | 0.629 |
+| Наивный CTR (клики / показы) | 0.163 |
+| Истинный CTR без эффекта позиции | 0.629 |
+| IPW-коррекция, кривая осмотра известна | 0.625 |
+| IPW-коррекция, кривая оценена через EM | 0.629 |
 
-The naive CTR under-states the true click propensity by **~4×**, because top
-positions get examined far more often. Inverse-propensity weighting against the
-position examination curve `(1/k)^η` recovers it; the EM variant recovers it
-without knowing the curve in advance.
+Наивный CTR занижает истинную склонность к клику **почти в 4 раза**: верхние позиции
+осматривают заметно чаще. Обратное взвешивание по вероятности (Horvitz–Thompson)
+против кривой осмотра `(1/k)^η` возвращает истину; EM-вариант делает то же самое, не
+зная кривой заранее.
 
-> **Takeaway.** Any raw-click-rate comparison across rankers is biased by
-> construction. The fix is not a better click metric but a position-aware
-> correction — and the EM variant means you don't need the curve as ground truth.
+> **Что это значит.** Любое сравнение ранкеров по сырому CTR смещено по построению.
+> Лечится не «метрикой получше», а поправкой на позицию — причём EM-вариант снимает
+> требование знать кривую как ground truth.
 
-### Funnel and revenue decay down the page
+### Воронка и затухание выручки по позициям
 
-![Impression, click, redirect and booking counts by position](reports/figures/funnel_by_position.png)
+![Показы, клики, переходы и брони по позициям](reports/figures/funnel_by_position.png)
 
-![Cumulative revenue share by position](reports/figures/cumulative_revenue_share.png)
+![Накопленная доля выручки по позиции](reports/figures/cumulative_revenue_share.png)
 
-Position 1 does most of the work: the examination curve collapses to
-`(1/k)^η` within a few slots, so both clicks and revenue concentrate at the top of
-the page. The cumulative revenue curve is the argument for how much slot real
-estate is actually worth to a partner.
+Позиция 1 делает почти всю работу: кривая осмотра схлопывается как `(1/k)^η` уже
+через несколько слотов, и на верх страницы приходится **47.3%** всей выручки. Кривая
+накопленной доли — это и есть аргумент в переговорах о том, сколько стоит реальная
+площадь слота для партнёра.
 
-> **Takeaway.** Revenue per slot is not linear in position — value drops faster
-> than rank number. Pricing partner slots (and setting a commission floor) should
-> follow the cumulative-share curve, not a flat per-impression rate.
+> **Что это значит.** Выручка на слот не линейна по позиции — ценность падает
+> быстрее, чем растёт номер. Прайсить слоты партнёрам (и ставить комиссионный пол)
+> нужно по кривой накопленной доли, а не по плоскому тарифу за показ.
 
-### Which partners earn their slot
+### Какие партнёры оправдывают слот
 
-![Partner quadrant: CTR versus commission per offer, bubble-sized by searches present](reports/figures/partner_quadrant.png)
+![Квадрант партнёров: CTR против комиссии на предложение, размер пузыря — число поисков](reports/figures/partner_quadrant.png)
 
-| Partner | Avg position | CTR | Commission / search | Rank |
+| Партнёр | Средняя позиция | CTR | Комиссия / поиск | Ранг |
 |---|---|---|---|---|
 | SkyTour | 2.75 | 0.376 | **862.6** | 1 |
 | OTA Global | 4.08 | 0.288 | 511.7 | 2 |
@@ -150,224 +188,273 @@ estate is actually worth to a partner.
 | GoFare | 9.56 | 0.049 | 1.14 | 7 |
 | CloudTrip | 7.91 | 0.084 | 0.97 | 8 |
 
-Monetisation is not spread evenly. The top five partners earn **99.3%** of all
-commission, while the bottom three (MetaFly, GoFare, CloudTrip) are placed at
-positions 8–9.5 and return about **1 per search** — they carry traffic but almost
-no revenue, because their commission per offer is under 0.5 against hundreds for
-the leaders.
+Монетизация распределена крайне неравномерно. Топ-5 партнёров дают **99.3%** всей
+комиссии, а нижние три (MetaFly, GoFare, CloudTrip) стоят на позициях 8–9.5 и
+возвращают около **1 единицы на поиск**: трафик они забирают, выручку почти не
+приносят, потому что их комиссия на предложение ниже 0.5 против сотен у лидеров.
 
-> **Takeaway.** A slot is worth what its partner pays, not what its CTR is. The
-> quadrant separates high-CTR/high-commission partners (keep and promote) from
-> deep-slot near-zero-commission partners (candidates to drop from the page) — a
-> decision the ranking policy alone would not surface.
+> **Что это значит.** Слот стоит столько, сколько платит его партнёр, а не столько,
+> каков его CTR. Квадрант отделяет высокий CTR при высокой комиссии (держать и
+> продвигать) от глубоких слотов с почти нулевой комиссией (кандидаты на удаление) —
+> политика ранжирования сама такого решения не покажет.
 
-### Experiment readout
+### Ридаут эксперимента
 
-![Fixed-horizon false-positive rate under repeated looks versus always-valid mSPRT](reports/peeking.png)
+![Доля ложных срабатываний при фиксированном горизонте и повторных взглядах против always-valid mSPRT](reports/peeking.png)
 
-| Check | Result | Reading |
+| Проверка | Результат | Чтение |
 |---|---|---|
-| SRM vs planned 90/10 | χ² = 0.119, **p = 0.730** | Split is sound |
-| SRM vs a naive 50/50 assumption | χ² = 2947, p ≈ 0 | The assumption, not the split, is wrong |
-| A/A test | **p = 0.721** | No false positive on a null difference |
-| Ratio metric, delta method | diff −77.2, SE 69.0, p = 0.264 | Not significant |
-| Same metric, naive per-unit | SE 88.5, p = 0.449 | Naive SE is **1.28× too wide** |
-| CUPED, real pre-period covariate | corr −0.006 → **+0.0%** variance cut | i.i.d. users: nothing to exploit |
-| CUPED, correlated positive control | corr 0.335 → **+11.2%** variance cut | Recovers the theoretical ρ² reduction |
-| Peeking, fixed-horizon α = 0.05 | FPR **14.5%** over 10 looks | 2.9× the nominal rate |
-| Peeking, mSPRT always-valid | FPR **0.25%** | Inflation factor 58× |
+| SRM против плановых 90/10 | χ² = 0.119, **p = 0.730** | Сплит в порядке |
+| SRM против наивного предположения 50/50 | χ² = 2947, p ≈ 0 | Неверно предположение, а не сплит |
+| A/A-тест | **p = 0.721** | Ложного срабатывания на нулевой разнице нет |
+| Ratio-метрика, дельта-метод | diff −77.2, SE 69.0, p = 0.264 | Незначимо |
+| Та же метрика, наивно по юнитам | SE 88.5, p = 0.449 | Наивная SE **в 1.28 раза шире** |
+| CUPED, реальная pre-period ковариата | corr −0.006 → **+0.0%** к снижению дисперсии | i.i.d.-пользователи: эксплуатировать нечего |
+| CUPED, коррелированный позитивный контроль | corr 0.335 → **+11.2%** к снижению дисперсии | Воспроизводит теоретическое ρ² |
+| Подглядывание, фиксированный горизонт α = 0.05 | FPR **14.5%** за 10 взглядов | В 2.9 раза выше номинала |
+| Подглядывание, always-valid mSPRT | FPR **0.25%** | Инфляционный множитель 58× |
 
-> **Takeaway.** Three traps on one page. A 90/10 split is fine but a 50/50
-> *assumption* would fake an SRM alarm; a ratio metric needs the delta method or
-> its error bar is 1.28× too wide; and watching a fixed-horizon p-value ten times
-> inflates the false-positive rate to 14.5% — the always-valid mSPRT holds it at
-> 0.25%, at the price of a 58× wider threshold.
+Всего 1,491 и 1,098 побед при 1,411 ничьих в interleaving-сравнении (4,000
+пользователей) — тест отдаёт решение в пользу A с win rate 37.3% против 27.5%;
+это позиционно-устойчивая альтернатива сырому CTR.
 
-### Required sample size
+> **Что это значит.** Три ловушки на одной странице. Сплит 90/10 нормален, но
+> *предположение* о 50/50 сфабриковало бы ложную тревогу SRM; ratio-метрике нужен
+> дельта-метод, иначе её погрешность завышена в 1.28 раза; а десять взглядов на
+> p-value фиксированного горизонта раздувают долю ложных срабатываний до 14.5% —
+> always-valid mSPRT удерживает её на 0.25%, но ценой в 58 раз более широкого порога.
 
-| Allocation | n total | Control | Test |
+### Необходимый размер выборки
+
+| Распределение | n всего | Контроль | Тест |
 |---|---|---|---|
-| 90/10 (planned) | **55,196** | 49,676 | 5,520 |
+| 90/10 (плановое) | **55,196** | 49,676 | 5,520 |
 | 50/50 | 19,871 | 9,935 | 9,935 |
 
-The 90/10 split costs **2.78×** the traffic of an even split for the same power —
-the real price of protecting the overwhelming majority of users from a change.
+Сплит 90/10 стоит **в 2.78 раза** больше трафика при той же мощности — это реальная
+цена защиты подавляющего большинства пользователей от изменения.
 
-> **Takeaway.** Sample size is the budget line for the whole experiment programme.
-> Choosing 90/10 is a product decision with a 2.78× traffic multiplier attached,
-> not a statistical detail.
+> **Что это значит.** Размер выборки — бюджетная строка всей программы
+> экспериментов. Выбор 90/10 — продуктовое решение с множителем трафика 2.78×, а не
+> статистическая деталь.
 
-### Measured islands: orders, supply and routes
+### Измеренные острова: заказы, предложение, маршруты
 
-Charts in this subsection are built from the **real** feeds (`orders`,
-`bookings_legs`, `events`, `sessions`) — not from the synthetic SERP layer. They
-describe the booking business, not the results page.
+Графики этого подраздела построены на **реальных** лентах (`orders`,
+`bookings_legs`, `events`, `sessions`,), а не на синтетическом слое SERP. Они
+описывают бизнес бронирований, а не страницу результатов.
 
-![Orders by service mix](reports/figures/orders_mix.png)
+![Заказы по составу услуг](reports/figures/orders_mix.png)
 
-![Top origin-destination routes by leg count](reports/figures/routes.png)
+![Топ маршрутов «откуда — куда» по числу сегментов](reports/figures/routes.png)
 
-![Legs by booking month](reports/figures/seasonality.png)
+![Сегменты по месяцу бронирования](reports/figures/seasonality.png)
 
-![Daily active users by experiment arm, events and sessions](reports/figures/ab_activity.png)
+![Дневная активность по плечам эксперимента: события и сессии](reports/figures/ab_activity.png)
 
 <details>
-<summary>Two more measured charts — refunds and geography</summary>
+<summary>Ещё два измеренных графика — возвраты и география</summary>
 
-![Refund rate and top origin-destination country pairs](reports/figures/refund_rate.png)
+![Доля возвратов и топ пар стран «откуда — куда»](reports/figures/refund_rate.png)
 
-![Top country pairs by order count](reports/figures/geo.png)
+![Топ пар стран по числу заказов](reports/figures/geo.png)
 
 </details>
 
-> **Takeaway.** `orders` and `bookings_legs` are islands — they carry no foreign
-> key to the clickstream — so they are reported separately and never fused with the
-> modeled SERP metrics. The measured A/B tab is the only place the real clickstream
-> touches an arm assignment.
+> **Что это значит.** `orders` и `bookings_legs` — острова: внешнего ключа к
+> кликстриму в них нет, поэтому их отчитывают отдельно и никогда не сливают со
+> смоделированными метриками SERP. Измеренная A/B-вкладка — единственное место, где
+> реальный кликстрим соприкасается с раздачей плечей.
 
-## Data
+## Выводы
 
-| Dataset | File | Rows | Grain |
+1. **Офлайн-метрика и деньги — не одно и то же.** NDCG-оптимум проигрывает
+   revenue-оптимуму ~328 единиц комиссии на поиск, и этот разрыв не зависит от силы
+   смещения позиции. Релизный гейт по офлайн-метрике систематически выбирает не ту
+   политику.
+2. **Смещение позиции корректируемо, и это окупается.** Сырой CTR занижает истинную
+   склонность к клику почти в 4 раза, а обучение клик-модели на IPW-взвешенных логах
+   даёт +19.3% выручки при том же фиттере — без единой новой фичи.
+3. **Выручка концентрируется наверху страницы.** Позиция 1 даёт 47.3% выручки, топ-5
+   партнёров — 99.3% комиссии. Хвост выдачи при этом забирает трафик и почти не
+   платит.
+4. **Статистические ловушки стоят дороже, чем кажется.** Наивная SE для ratio-метрики
+   шире в 1.28 раза, повторные взгляды на p-value раздувают FPR до 14.5%, а CUPED на
+   i.i.d.-пользователях не даёт ничего (0.0%, против 11.2% на коррелированном
+   контроле).
+5. **Дизайн эксперимента — продуктовая статья расходов.** 90/10 стоит 2.78× трафика
+   против 50/50 при той же мощности, то есть выбор сплита — это решение о том,
+   сколько пользователей вы готовы подвергнуть изменению.
+6. **Смоделированный слой честно размечен как смоделированный.** Реальных логов
+   показов для этой поверхности нет, поэтому resemblance синтетического SERP к
+   продовому трафику — это *допущение*, а не измерение; якоря симулятора
+   (разброс цен внутри маршрута, календарь) выводятся из измеренных островов.
+
+## Рекомендации
+
+| Решение | Почему | На чём основано |
+|---|---|---|
+| Сделать северной звездой ранжирования выручку на поиск | Офлайн-NDCG и клики растут там, где падает комиссия | Δ −327.7 на поиск, свип держит знак на η ∈ [0.6, 1.6] |
+| Обучать клик-модель на IPW-взвешенных логах | Тот же фиттер, +19.3% выручки и выше NDCG — улучшение бесплатное | `propensity_logistic` 826.6 против `click_trained` 693.0 |
+| Сравнивать ранкеры онлайн через interleaving или IPW-поправку | Сырой CTR смещён почти в 4 раза по построению | Naive 0.163 против истинного 0.629; interleaving даёт решение A при 1,491 : 1,098 |
+| Прайсить слоты по кривой накопленной выручки | Ценность слота падает быстрее, чем растёт номер позиции | Позиция 1 = 47.3% выручки |
+| Пересмотреть партнёров на позициях 8–9.5 | ~1 единица на поиск при CTR 5–8%: трафик без денег | MetaFly 1.25, GoFare 1.14, CloudTrip 0.97; топ-5 = 99.3% комиссии |
+| Оставить 90/10, приняв множитель трафика осознанно | Защищает 90% пользователей, но требует 2.78× трафика | 55,196 против 19,871 наблюдений |
+| Не смотреть на p-value повторно без последовательного теста | Десять взглядов поднимают FPR до 14.5% | mSPRT держит 0.25% при пороге в 58 раз шире |
+| Считать ratio-метрики дельта-методом | Наивный тест завышает погрешность и может перевернуть решение | SE 88.5 против 69.0 (1.28×) |
+| Включать CUPED только при реально коррелирующей pre-period | На i.i.d.-пользователях выигрыш нулевой | 0.0% на реальной ковариате, 11.2% на позитивном контроле |
+| Проверять MDE до запуска | Эффект меньше MDE при текущем трафике не поймать | Требуется 55,196 наблюдений на эффект +5% |
+
+## Данные
+
+| Датасет | Файл | Строк | Гранулярность |
 |---|---|---|---|
-| Bookings (Aviastats) | `data.csv` | 135,508 | booking, exploded to 137,082 leg rows |
-| Paid-service orders | `booking_analytics_test_df.csv` | 8,966 | order × service |
-| Product events | `task_1_events.csv` | 44,568 | raw event (user × timestamp) |
+| Брони (Aviastats) | `data.csv` | 135,508 | бронь, развёрнутая в 137,082 строки сегментов |
+| Заказы платных услуг | `booking_analytics_test_df.csv` | 8,966 | заказ × услуга |
+| Продуктовые события | `task_1_events.csv` | 44,568 | сырое событие (пользователь × время) |
 
-The 135,508 bookings carry 137,082 legs; 1,574 bookings contain a connection.
-24 airlines, 11 origins and 10 destinations appear. The leg JSON is **ragged** —
-1,679 legs have no `airline`, 1,697 no `origin`, 1,696 no `destination` and 1,772
-no `baggage` key. Absent `origin`/`destination`/`airline` are preserved as `pd.NA`
-(nullable `string`), never imputed; `baggage` alone defaults to `"No baggage"` so
-`has_baggage` stays a non-nullable boolean.
+135,508 броней несут 137,082 сегмента; 1,574 брони содержат стыковку. В данных 24
+авиакомпании, 11 пунктов отправления и 10 пунктов назначения. JSON сегментов
+**разрежен**: у 1,679 сегментов нет `airline`, у 1,697 нет `origin`, у 1,696 нет
+`destination`, у 1,772 нет ключа `baggage`. Отсутствующие `origin`/`destination`/
+`airline` сохраняются как `pd.NA` (nullable `string`) и никогда не импутируются;
+только `baggage` по умолчанию превращается в `"No baggage"`, чтобы `has_baggage`
+остался ненулевым булевым.
 
-**Raw third-party data is NOT committed to this repository.** These are booking
-records supplied for an interview assignment. Only the *loader*
-(`src/data_ingest.py`), the synthetic SERP generator, and the SQL are here; the
-`data/processed/*.parquet`, `data/raw/*` and `reports/*` outputs are gitignored.
+**Сырые сторонние данные в репозиторий не коммитятся.** Это записи о бронированиях,
+выданные под тестовое задание. Здесь лежат только *загрузчик*
+(`src/data_ingest.py`), генератор синтетического SERP и SQL; `data/processed/*.parquet`,
+`data/raw/*` и `reports/*` — в `.gitignore`.
 
-To run the pipeline against the real feeds, point the loader at them:
+Чтобы прогнать пайплайн на реальных лентах, укажите на них загрузчик:
 
 ```bash
-export AVIASALES_SOURCE_DIR="/path/to/Aviasales"   # holds the 3 subdirectories
+export AVIASALES_SOURCE_DIR="/path/to/Aviasales"   # содержит 3 подкаталога
 ```
 
-The directory must contain `Aviastats Аналитик/`, `Booking — Продуктовый аналитик/`
-and `Продуктовый аналитик-2/`. Alternatively pass `--source-dir`, or drop the
-files under `data/raw/` and rely on the default. Without the feeds, the ingest
-stage fails loudly (by design) — but the SERP, ranking and experiment stages run
-entirely on the committed synthetic layer.
+Каталог должен содержать `Aviastats Аналитик/`, `Booking — Продуктовый аналитик/` и
+`Продуктовый аналитик-2/`. Либо передайте `--source-dir`, либо положите файлы в
+`data/raw/` и положитесь на путь по умолчанию. Без лент стадия `ingest` падает
+громко (так и задумано) — но стадии SERP, ранжирования и эксперимента целиком
+работают на закоммиченном синтетическом слое.
 
-One option test (`tests/test_stats.py`) cross-checks the vendored statistics
-against a sibling project's real answer; it skips unless you set
-`AVIASALES_AB_CTR_DIR` to that project.
+Один опциональный тест (`tests/test_stats.py`) сверяет вендоренную статистику с
+реальным ответом соседнего проекта; он скипается, пока не задан `AVIASALES_AB_CTR_DIR`.
 
-## Methods
+## Методы
 
-- **Position-bias model (PBM).** Examination probability decays with position as
-  `(1/k)^η`, `η = 1.3` mobile / `1.0` desktop. Clicks are `examined × relevance`.
-- **Unbiased CTR.** Horvitz–Thompson inverse-propensity weighting, with the curve
-  either known or fitted by EM.
-- **Ranking metrics.** NDCG@10 on graded relevance, MRR, plus team-draft
-  interleaving as the online (position-bias-robust) alternative.
-- **Ratio metrics.** Revenue per search is a ratio of sums, so it needs the delta
-  method for its variance — the naive per-unit test is both wrong and conservative
-  here.
-- **CUPED.** Pre-period revenue per search as the covariate, with a shuffled
-  covariate as a mutation control.
-- **Sequential testing.** Fixed-horizon p-values under repeated looks are compared
-  against an always-valid mSPRT to quantify the peeking penalty.
+- **Модель смещения позиции (PBM).** Вероятность осмотра убывает с позицией как
+  `(1/k)^η`, `η = 1.3` на мобильных / `1.0` на десктопе. Клик = «осмотрел × релевантно».
+- **Несмещённый CTR.** Обратное взвешивание по вероятности (Horvitz–Thompson): кривая
+  либо известна, либо восстанавливается через EM.
+- **Метрики ранжирования.** NDCG@10 по градуированной релевантности, MRR, плюс
+  team-draft interleaving как онлайн-альтернатива, устойчивая к смещению позиции.
+- **Ratio-метрики.** Выручка на поиск — отношение сумм, поэтому для её дисперсии нужен
+  дельта-метод; наивный тест по юнитам здесь и неверен, и консервативен.
+- **CUPED.** Ковариата — выручка на поиск за предпериод, с перемешанной ковариатой как
+  мутационным контролем.
+- **Последовательное тестирование.** p-value фиксированного горизонта при повторных
+  взглядах сравниваются с always-valid mSPRT, чтобы измерить цену подглядывания.
+- **Якорение симулятора.** `src/calibration.py` вытаскивает якоря **только из
+  реальных островов** и записывает их **только в ручки симулятора** (разброс цен
+  внутри маршрута → `price_sigma`, доли месяцев → календарь). Ни одна строка реальных
+  данных не попадает в `serp_offers`, так что граница «смоделировано / измерено» не
+  нарушается. Клик-модель, таблица партнёров и ставки комиссии из островов
+  **не идентифицируемы** — модуль этого и не заявляет.
 
-## Quick start
+## Быстрый старт
 
 ```bash
 uv sync --all-groups
 uv run python run.py --stage all      # ingest → sessions → serp → sql → rank → experiment → business
-uv run pytest -q                      # 80 tests (78 pass, 2 skip without sibling data)
+uv run pytest -q                      # 110 тестов (108 проходят, 2 скипаются без соседних данных)
 uv run ruff check . && uv run ruff format --check .
-uv run streamlit run app.py           # dashboard on :8501
+uv run streamlit run app.py           # дашборд на :8501
 ```
 
-`--stage` accepts `ingest`, `sessions`, `serp`, `rank` (alias `eval`), `experiment`
-or `all`.
+`--stage` принимает `ingest`, `sessions`, `serp`, `rank` (алиас `eval`), `experiment`
+или `all`.
 
-The dashboard has seven pages — Funnel, Revenue by position, Ranking policies,
-Position bias & partners, Ancillary & refunds, Supply & routes, Experiment — over
-the same Parquet and JSON the pipeline writes.
+В дашборде семь страниц — Funnel, Revenue by position, Ranking policies, Position bias
+& partners, Ancillary & refunds, Supply & routes, Experiment — поверх тех же Parquet и
+JSON, что пишет пайплайн.
 
-## Status
+## Статус
 
-All three phases complete.
+Все три фазы завершены.
 
-| Phase | Scope | State |
+| Фаза | Объём | Состояние |
 |---|---|---|
-| 1 | Data foundation: ingest, leg explosion, normalisation SQL, sessionisation | Done |
-| 2 | SERP ranking simulator over `serp_offers` + ranking evaluation | Done |
-| 3 | A/B experiment on the ranking policy + dashboard | Done |
+| 1 | Основа данных: ingest, разворот сегментов, нормализующий SQL, сессионизация | Готово |
+| 2 | Симулятор ранжирования SERP поверх `serp_offers` + оценка ранжирования | Готово |
+| 3 | A/B-эксперимент над политикой ранжирования + дашборд | Готово |
+| 4 | «Боевые» политики, свип чувствительности, якорение симулятора, `interleaving` | Реализовано и покрыто тестами; в `run.py` не подключено |
 
-Verified: `uv sync --all-groups` resolves; `uv run python run.py --stage all` runs
-end-to-end; `uv run pytest -q` is **78 passed, 2 skipped** (the 2 skip without the
-optional sibling data); `uv run ruff check .` and `uv run ruff format --check .` are clean;
-`uv run streamlit run app.py` serves on `localhost:8501`.
+Проверено: `uv sync --all-groups` разрешается; `uv run python run.py --stage all`
+проходит end-to-end; `uv run pytest -q` даёт **108 passed, 2 skipped** (два скипаются
+без опциональных соседних данных); `uv run ruff check .` и `uv run ruff format --check .`
+чисты; `uv run streamlit run app.py` отдаёт страницу на `localhost:8501`.
 
-**Not verified / inference:** the synthetic SERP layer resembling real production
-traffic is an *inference*, not a measurement — no real impression log exists for
-this surface. `sql/03_funnel.sql` is written against the `serp_offers` relation and
-executes when that Parquet is registered, but it is not wired into `run.py`.
-`sql/01_normalize.sql` and `sql/02_sessions.sql` **are** executed by the pipeline.
+**Не проверено / допущение:** то, что синтетический слой SERP похож на реальный
+продовый трафик, — это *допущение*, а не измерение: реального лога показов для этой
+поверхности не существует. `sql/03_funnel.sql` написан против отношения
+`serp_offers` и исполняется, когда этот Parquet зарегистрирован, но в `run.py` он не
+подключён. `sql/01_normalize.sql` и `sql/02_sessions.sql` пайплайном **исполняются**.
 
-## Layout
+## Структура
 
 ```
 serp-rank-lab/
 ├── pyproject.toml
 ├── .gitignore
 ├── README.md
-├── PRD.md                  # product requirements
-├── CONTEXT.md              # glossary — precise meaning of every term
+├── PRD.md                  # требования к продукту
+├── CONTEXT.md              # глоссарий — точное значение каждого термина
 ├── LICENSE
-├── run.py                  # pipeline entry point
-├── app.py                  # Streamlit dashboard
+├── run.py                  # точка входа пайплайна
+├── app.py                  # дашборд Streamlit
 ├── src/
-│   ├── data_ingest.py      # loaders + leg explosion + parquet writer + CLI
-│   ├── sessions.py         # DuckDB-backed sessionisation
-│   ├── serp_sim.py         # synthetic results pages + PBM click model
-│   ├── ranking_eval.py     # unbiased CTR, NDCG/MRR, interleaving
-│   ├── stats.py            # vendored experiment statistics
-│   ├── experiment.py       # SRM, A/A, delta method, CUPED, mSPRT
-│   ├── business.py         # measured order / supply / route reporting
-│   ├── sql_stage.py        # runs sql/03 + sql/04 against serp_offers
-│   └── plots.py            # matplotlib figure builders
+│   ├── data_ingest.py      # загрузчики + разворот сегментов + запись parquet + CLI
+│   ├── sessions.py         # сессионизация на DuckDB
+│   ├── serp_sim.py         # синтетические страницы результатов + клик-модель PBM
+│   ├── calibration.py      # якорение ручек симулятора по измеренным островам
+│   ├── policies.py         # оракульные и «боевые» политики ранжирования
+│   ├── ranking_eval.py     # несмещённый CTR, NDCG/MRR, interleaving
+│   ├── stats.py            # вендоренная статистика эксперимента
+│   ├── experiment.py       # SRM, A/A, дельта-метод, CUPED, mSPRT
+│   ├── business.py         # отчёт по измеренным заказам / предложению / маршрутам
+│   ├── sql_stage.py        # прогон sql/03 + sql/04 против serp_offers
+│   └── plots.py            # сборка графиков matplotlib
 ├── sql/
-│   ├── 01_normalize.sql    # flight legs / orders / events normalisation views
-│   ├── 02_sessions.sql     # 30-min inactivity + date-boundary session rule
-│   ├── 03_funnel.sql       # search → click → redirect → buy
+│   ├── 01_normalize.sql    # нормализующие представления сегментов / заказов / событий
+│   ├── 02_sessions.sql     # правило сессии: 30 минут неактивности + граница суток
+│   ├── 03_funnel.sql       # поиск → клик → переход → покупка
 │   └── 04_revenue_per_search.sql
 ├── notebooks/
 │   ├── 01_ranking_monetisation.ipynb
 │   └── 02_business_revenue.ipynb
 ├── docs/
-│   └── adr/0001-modeled-vs-measured.md   # the fusion boundary, and why
-├── tests/                  # 80 tests
+│   └── adr/0001-modeled-vs-measured.md   # граница слияния и почему она такая
+├── tests/                  # 110 тестов
 ├── data/
-│   ├── raw/                # .gitkeep only — real data is not committed
-│   └── processed/          # generated parquet (gitignored)
+│   ├── raw/                # только .gitkeep — реальные данные не коммитятся
+│   └── processed/          # сгенерированный parquet (в .gitignore)
 └── reports/
-    ├── figures/            # committed charts used in this README
-    └── *.json, *.png       # generated reports (gitignored)
+    ├── figures/            # закоммиченные графики, использованные в этом README
+    └── *.json, *.png       # сгенерированные отчёты (в .gitignore)
 ```
 
-## Provenance
+## Происхождение
 
-The statistics in `src/stats.py` are vendored from the author's own
-`ab_test/scripts/` toolkit and cross-checked against a sibling A/B project's
-documented answers (see `tests/test_stats.py`). Everything else is written for
-this lab.
+Статистика в `src/stats.py` вендорена из собственного тулкита автора
+`ab_test/scripts/` и сверена с задокументированными ответами соседнего A/B-проекта
+(см. `tests/test_stats.py`). Всё остальное написано для этой лаборатории.
 
-Licensed under the MIT License — see `LICENSE`.
+Лицензия MIT — см. `LICENSE`.
 
-## Related
+## Связанное
 
-- **Dashboard:** `uv run streamlit run app.py` — the interactive surface over the same outputs.
-- **Glossary:** [`CONTEXT.md`](CONTEXT.md) — the precise meaning of every term used above.
-- **Design note:** [`docs/adr/0001-modeled-vs-measured.md`](docs/adr/0001-modeled-vs-measured.md) — why modeled and measured data never fuse.
-- **Author:** [Nikita Boyarkin](https://github.com/NikitaBoyarkin) — portfolio of product-analytics projects.
+- **Дашборд:** `uv run streamlit run app.py` — интерактивная поверхность над теми же выходными данными.
+- **Глоссарий:** [`CONTEXT.md`](CONTEXT.md) — точное значение каждого термина, использованного выше.
+- **Заметка о дизайне:** [`docs/adr/0001-modeled-vs-measured.md`](docs/adr/0001-modeled-vs-measured.md) — почему смоделированные и измеренные данные никогда не сливаются.
+- **Автор:** [Nikita Boyarkin](https://github.com/NikitaBoyarkin) — портфель проектов продуктовой аналитики.
