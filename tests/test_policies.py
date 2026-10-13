@@ -14,6 +14,8 @@ that make the claim defensible:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -27,6 +29,13 @@ from src.policies import (
 )
 from src.ranking_eval import compare_rankings
 from src.serp_sim import SimConfig, load_routes, load_user_ids, simulate_serps
+
+_ARTIFACT = Path(__file__).resolve().parents[1] / "data" / "processed" / "bookings_legs.parquet"
+_NEEDS_DATA_REASON = (
+    "needs data/processed/bookings_legs.parquet, which is built from the gitignored "
+    "raw Aviasales feeds and therefore unavailable in CI"
+)
+NEEDS_DATA = pytest.mark.skipif(not _ARTIFACT.exists(), reason=_NEEDS_DATA_REASON)
 
 SIM = SimConfig(n_searches=400, seed=7)
 ALL_POLICIES = ("relevance", "revenue", *REALISTIC_POLICIES)
@@ -68,6 +77,7 @@ def _orders(offers, ctx, names):
 # --------------------------------------------------------------------------- #
 
 
+@NEEDS_DATA
 def test_a1_at_least_two_realistic_policies_differ_from_both_references(split, ctx):
     """Each realistic policy must disagree with the oracle *and* with the greedy
     optimum on a strict majority of searches -- that is what "not an oracle" means."""
@@ -86,6 +96,7 @@ def test_a1_at_least_two_realistic_policies_differ_from_both_references(split, c
     assert len(distinct) >= 2, f"only {distinct} differ from both references on a majority"
 
 
+@NEEDS_DATA
 def test_a1_realistic_policies_score_below_the_oracle(split, ctx):
     _, test = split
     summary = compare_rankings(test, k=10, policies=ALL_POLICIES, ctx=ctx).set_index("policy")
@@ -96,6 +107,7 @@ def test_a1_realistic_policies_score_below_the_oracle(split, ctx):
         assert float(summary.loc[name, "ndcg_at_k"]) < oracle, name
 
 
+@NEEDS_DATA
 def test_a1_scrambling_relevance_does_not_move_a_realistic_policy(offers, ctx):
     """Order under scrambled ``relevance`` must be identical -- i.e. unread."""
     frame = _first_frame(offers)
@@ -109,6 +121,7 @@ def test_a1_scrambling_relevance_does_not_move_a_realistic_policy(offers, ctx):
         )
 
 
+@NEEDS_DATA
 def test_learned_policies_refuse_to_run_without_coefficients(offers):
     frame = _first_frame(offers)
     bare = PolicyContext()
@@ -117,6 +130,7 @@ def test_learned_policies_refuse_to_run_without_coefficients(offers):
             POLICIES[name](frame, bare)
 
 
+@NEEDS_DATA
 def test_dropping_a_policy_from_the_table_does_not_renumber_the_others(offers, ctx):
     """The registry is keyed by name; row position carries no meaning."""
     two = compare_rankings(offers, k=10, policies=("relevance", "revenue"), ctx=ctx)
@@ -152,6 +166,7 @@ def test_a_two_offer_reference_table_matches_the_hand_computed_divergence():
 # --------------------------------------------------------------------------- #
 
 
+@NEEDS_DATA
 def test_a2_train_and_test_searches_are_disjoint(offers, split):
     train, test = split
     assert set(train["search_id"]).isdisjoint(set(test["search_id"]))
@@ -160,6 +175,7 @@ def test_a2_train_and_test_searches_are_disjoint(offers, split):
     assert test["search_id"].nunique() > 0
 
 
+@NEEDS_DATA
 def test_a2_the_split_is_deterministic(offers):
     a_train, a_test = train_test_split_searches(offers, test_frac=0.5, seed=0)
     b_train, b_test = train_test_split_searches(offers, test_frac=0.5, seed=0)
@@ -167,6 +183,7 @@ def test_a2_the_split_is_deterministic(offers):
     assert set(a_test["search_id"]) == set(b_test["search_id"])
 
 
+@NEEDS_DATA
 def test_a2_the_fit_uses_the_train_half_and_not_the_whole_frame(offers, split):
     """Mutation control: if ``context_for`` ignored its ``train`` argument and
     fitted on everything, the two halves would give the same coefficients."""
@@ -177,6 +194,7 @@ def test_a2_the_fit_uses_the_train_half_and_not_the_whole_frame(offers, split):
     assert not np.allclose(on_train, on_test)
 
 
+@NEEDS_DATA
 def test_a2_a_single_search_cannot_be_split(offers):
     single = offers[offers["search_id"] == offers["search_id"].iloc[0]]
     with pytest.raises(ValueError):
@@ -188,6 +206,7 @@ def test_a2_a_single_search_cannot_be_split(offers):
 # --------------------------------------------------------------------------- #
 
 
+@NEEDS_DATA
 def test_both_learned_models_fit_finitely(ctx):
     for name in ("click_trained", "propensity_logistic"):
         beta = np.asarray(ctx.params[name], dtype=float)
@@ -195,6 +214,7 @@ def test_both_learned_models_fit_finitely(ctx):
         assert np.all(np.isfinite(beta))
 
 
+@NEEDS_DATA
 def test_ipw_weighting_actually_moves_the_price_coefficient(ctx):
     """If the two fits were identical the 'controlled pair' would be decoration."""
     raw = np.asarray(ctx.params["click_trained"], dtype=float)

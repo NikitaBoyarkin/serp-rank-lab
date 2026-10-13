@@ -9,12 +9,22 @@ user was drawn per offer), which silently broke every per-user metric downstream
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from src.serp_sim import PARTNERS, SimConfig, load_routes, load_user_ids, simulate_serps
+
+_ARTIFACT = Path(__file__).resolve().parents[1] / "data" / "processed" / "bookings_legs.parquet"
+pytestmark = pytest.mark.skipif(
+    not _ARTIFACT.exists(),
+    reason=(
+        "needs data/processed/bookings_legs.parquet, which is built from the gitignored "
+        "raw Aviasales feeds and therefore unavailable in CI"
+    ),
+)
 
 SMALL = SimConfig(n_searches=300)
 
