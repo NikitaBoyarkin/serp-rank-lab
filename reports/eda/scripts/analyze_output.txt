@@ -1,0 +1,226 @@
+
+==============================================================================
+PHASE 2 — VALIDITY, DUPES, RANGES, LOGIC
+==============================================================================
+offers full-row dupes: 0
+offers key (search_id,position) dupes: 0
+offers key (search_id,partner) dupes: 73203
+offers positions range: 1 - 15
+offers offers-per-search: min/max/mean: {'min': 5.0, 'max': 15.0, 'mean': 10.011333333333333}
+booking_month range: 1 - 8
+commission >= 0: True | negative: 0
+relevance in [0,1]: True | examine_prob in [0,1]: True | click_prob in [0,1]: True
+commission>0 & not booked: 2361
+  by partner_type: {'CPC': 2361}
+  CPC commission>0 share of CPC: 0.0651 | CPC commission>0 & clicked: 2928
+booked & not clicked: 0
+redirected & not clicked: 0
+booked & not redirected: 0
+clicked -> clicked implies examine_prob? mean examine_prob clicked: 0.5714
+corr(expected_revenue, click_prob*commission): 0.338825
+expected_revenue == click_prob*commission (allclose, rtol=1e-6): False
+expected_revenue == click_prob*commission*booked?: 0.338825
+corr(relevance, click_prob): 0.329453
+mean relevance (ground-truth click propensity, no position): 0.628686
+naive CTR clicked.mean(): 0.16304
+mean click_prob: 0.163398
+
+==============================================================================
+PHASE 2 — ORDERS VALIDITY
+==============================================================================
+orders full-row dupes: 4
+orders order_id dupes: 163
+order_price min/max: 1022.32 10435138.94
+order_price <= 0: 0
+order_date range: 2023-11-01 00:00:00 - 2024-01-19 00:00:00
+orders is_return values: [0, 1] | share: 0.2524
+service_profit < 0: 0
+service null share: 0.7942
+
+==============================================================================
+PHASE 2 — SESSIONS / EVENTS / SRM
+==============================================================================
+sessions range: 2023-05-01 00:01:33.241816 - 2023-05-08 23:15:23.946260
+sessions dupes: 0 | neg duration: 0
+events range: 2023-05-01 00:01:33.241816 - 2023-05-08 23:15:23.946260
+events dupes: 0
+sessions ab_group: {'B': 2977, 'A': 2947}
+events ab_group: {'A': 22360, 'B': 22208}
+sessions split A/B: 0.4975 0.5025
+
+==============================================================================
+PHASE 3 — CORRELATIONS (offers numeric)
+==============================================================================
+  examine_prob       ~ click_prob         r=+0.9802
+  examine_prob       ~ expected_revenue   r=+0.8541
+  click_prob         ~ expected_revenue   r=+0.8488
+  position           ~ examine_prob       r=-0.7190
+  position           ~ click_prob         r=-0.6979
+  position           ~ expected_revenue   r=-0.6178
+  relevance          ~ price_rank         r=-0.5760
+
+==============================================================================
+PHASE 4 — METRIC BY SEGMENT
+==============================================================================
+total commission: 14707529.1
+position-1 revenue share: 0.4735 | top-3 share: 0.7944
+partner_type:
+               count     mean           sum  share
+partner_type                                     
+CPA           75168  194.256  1.460185e+07  0.993
+CPC           44968    2.350  1.056760e+05  0.007
+device mean:
+          count    mean         sum
+device                            
+desktop  45302  137.22  6216410.93
+mobile   74834  113.47  8491118.17
+partner:
+              count     mean          sum  share
+partner                                        
+SkyTour      14923  338.767  5055420.108  0.344
+OTA Global   15210  199.737  3037999.459  0.207
+AviaCenter   14957  191.559  2865147.004  0.195
+FlyDirect    14820  156.027  2312325.056  0.157
+TripMasters  15258   87.230  1330961.476  0.090
+GoFare       15098    2.854    43094.000  0.003
+MetaFly      14689    2.346    34466.000  0.002
+CloudTrip    15181    1.852    28116.000  0.002
+top-5 partner commission share: 0.9928
+
+==============================================================================
+PHASE 4b — COMPOSITION CHECK (position gap vs partner_type)
+==============================================================================
+CPA share by position (head):
+ position
+1    0.988
+2    0.964
+3    0.909
+4    0.816
+5    0.694
+6    0.608
+7    0.526
+8    0.440
+mean commission by position within CPA only:
+position
+1    586.86
+2    253.64
+3    162.81
+4     97.51
+5     99.89
+6     62.31
+7     60.34
+8     42.60
+mean commission by position within CPC only:
+position
+1    31.66
+2    10.43
+3     6.49
+4     4.01
+5     3.27
+6     2.83
+7     2.42
+8     2.03
+
+==============================================================================
+PHASE 5 — TREND (booking_month seasonality, offers)
+==============================================================================
+               count     mean          sum  per_offer  delta_sum  delta_per_offer
+booking_month                                                                    
+1              10827  110.289  1194102.529    110.289        NaN              NaN
+2               9873  117.891  1163941.281    117.891     -0.025            0.069
+3              12069  112.682  1359954.181    112.682      0.168           -0.044
+4              12680  125.204  1587592.505    125.204      0.167            0.111
+5              17739  118.257  2097759.425    118.257      0.321           -0.055
+6              19908  138.143  2750154.490    138.143      0.311            0.168
+7              18920  121.874  2305854.545    121.874     -0.162           -0.118
+8              18120  124.071  2248170.146    124.071     -0.025            0.018
+mean booking_month by booked vs not:
+booked
+False    5.016
+True     5.118
+
+==============================================================================
+PHASE 5 — ORDERS WEEKLY (measured track)
+==============================================================================
+                  sum  count  per_unit  d_sum
+order_date                                   
+2023-11-05   52516.45    417    125.94    NaN
+2023-11-12   52265.24    540     96.79  -0.00
+2023-11-19  100692.37    467    215.62   0.93
+2023-11-26   89739.18    734    122.26  -0.11
+2023-12-03   86172.78    595    144.83  -0.04
+2023-12-10  101000.17    756    133.60   0.17
+2023-12-17  100763.83    661    152.44  -0.00
+2023-12-24  157613.11    917    171.88   0.56
+2023-12-31  194317.19   1122    173.19   0.23
+2024-01-07  167290.23    869    192.51  -0.14
+2024-01-14  179194.15    947    189.22   0.07
+2024-01-21  200600.93    941    213.18   0.12
+
+==============================================================================
+RECONCILIATION — partner_quality vs serp_offers aggregate
+==============================================================================
+       partner  offers_pq  offers_raw  d_offers  clicks_pq  clicks_raw  d_clicks  bookings_pq  bookings_raw  d_bookings  d_commission  d_avgpos
+0      SkyTour      14923       14923         0       5615        5615         0         1311          1311           0           0.0       0.0
+1   OTA Global      15210       15210         0       4386        4386         0         1121          1121           0           0.0       0.0
+2   AviaCenter      14957       14957         0       3297        3297         0          614           614           0           0.0       0.0
+3    FlyDirect      14820       14820         0       2235        2235         0          382           382           0           0.0       0.0
+4  TripMasters      15258       15258         0       1126        1126         0          173           173           0          -0.0       0.0
+5      MetaFly      14689       14689         0        907         907         0          190           190           0           0.0       0.0
+6       GoFare      15098       15098         0        743         743         0          115           115           0           0.0       0.0
+7    CloudTrip      15181       15181         0       1278        1278         0          262           262           0           0.0       0.0
+max abs d_commission: 0.0
+total commission raw: 14707529.1 | pq: 14707529.1
+
+==============================================================================
+RECONCILIATION — funnel_by_position vs offers
+==============================================================================
+    position  bookings_fbp  bookings_raw  d_bookings  d_commission
+0          1          1811          1811           0       -3976.0
+1          2           757           757           0       -3550.0
+2          3           486           486           0       -5748.0
+3          4           287           287           0       -7252.0
+4          5           235           235           0       -9782.0
+5          6           156           156           0       -9576.0
+6          7           124           124           0       -9332.0
+7          8            81            81           0       -8480.0
+8          9            61            61           0       -7388.0
+9         10            53            53           0       -6256.0
+10        11            44            44           0       -5116.0
+11        12            28            28           0       -3638.0
+12        13            28            28           0       -3254.0
+13        14            11            11           0       -1604.0
+14        15             6             6           0       -1070.0
+max abs d_bookings: 0 | max abs d_commission: 9782.0
+
+==============================================================================
+RECONCILIATION — revenue_per_search vs offers (by search_id)
+==============================================================================
+n searches rps: 12000 | raw: 12000 | merged: 12000
+max abs d_revenue: 0.0
+max abs d_clicks: 0
+max abs d_bookings: 0
+rps logged revenue_per_search: 1225.6274
+
+==============================================================================
+RECONCILIATION — search_funnel vs offers
+==============================================================================
+search_funnel rows: 12000 | offers searches: 12000
+sf converted share: 0.3033 | booked share (offers): 0.3033
+sf commission sum: 14621507.1 | offers commission sum: 14707529.1
+
+==============================================================================
+README TRUTH CHECK
+==============================================================================
+relevance rev/search = 868.87 ; revenue rev/search = 1196.59
+  ratio-1 = 37.7184%  (README says +38%)
+propensity 826.56 vs click_trained 692.98 -> 19.2766% (README says +19.3%)
+NDCG relevance 1.0000 vs revenue 0.9316 -> dNDCG 0.0684, dRev -327.72
+
+==============================================================================
+README — ORACLE RE-RANK FROM RAW (k=10)
+==============================================================================
+recompute relevance-oracle rev/search = 1157.00 (json 868.87)
+recompute revenue-oracle   rev/search = 1225.63 (json 1196.59)
+position-1 share recompute: 0.4735
+top-5 partner share recompute: 0.9928
