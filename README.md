@@ -24,6 +24,8 @@
 - 🏦 [Флагманский кейс: Volta neobank](https://github.com/NikitaBoyarkin/volta-banking)
 - 🧪 Связанные: [ab_test](https://github.com/NikitaBoyarkin/ab_test) · [causal-uplift](https://github.com/NikitaBoyarkin/causal-uplift) · [browser-mini-games](https://github.com/NikitaBoyarkin/browser-mini-games)
 
+**▶ [Диаграмма: SERP Rank Lab — relevance ranking vs commission ranking](docs/diagrams/serp-rank-lab.html)** — открывается в браузере, без установки и сборки
+
 **На этой странице:** [Ситуация](#ситуация) · [Задача](#задача) · [Действия](#действия) · [Результат](#результат) · [Результаты](#результаты) · [Выводы](#выводы) · [Рекомендации](#рекомендации) · [Методы](#методы) · [Быстрый старт](#быстрый-старт) · [Структура](#структура)
 
 - [Что делает](#что-делает)
