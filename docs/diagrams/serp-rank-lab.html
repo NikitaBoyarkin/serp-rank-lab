@@ -54,6 +54,17 @@
       margin-bottom: 0.5rem;
     }
 
+    .lede {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--muted);
+      max-width: 940px;
+      margin: -0.6rem 0 1.3rem;
+    }
+
+    .lede strong { color: var(--ink); font-weight: 600; }
+
     h1 {
       font-family: var(--font-title);
       font-size: 28px;
@@ -113,12 +124,17 @@
 <body>
   <main class="frame">
     <p class="eyebrow">Data flow · SERP Rank Lab</p>
-    <h1>SERP Rank Lab — relevance ranking vs commission ranking</h1>
+    <h1>SERP Rank Lab — ranking by clicks vs ranking by money</h1>
+    <p class="lede">Two <strong>feasible</strong> policies on the same logged information set:
+    ranking by fitted click probability x commission returns <strong>+34.45% revenue per
+    search</strong> and gives up <strong>-16.84% of clicks</strong>. At that exchange rate a
+    forgone click has to be worth <strong>981.83 ₽</strong> — an external LTV assumption that
+    is not in the data, so the number is quoted as a rate, not as a verdict.</p>
 
     <div class="diagram-container">
       <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="serp-rank-lab-title serp-rank-lab-desc">
-        <title id="serp-rank-lab-title">SERP ranking data flow: metric vs money</title>
-        <desc id="serp-rank-lab-desc">Data flow of a flight metasearch SERP lab: ingested measured feeds are fenced off from a modeled SERP layer that turns real route and price pairs into offers; two oracle ranking policies order those offers by relevance or by partner commission, position-biased simulated clicks are corrected with inverse-propensity weighting, and the readout shows the offline NDCG@10 and the money metric revenue per search pulling in opposite directions, 38 percent apart.</desc>
+        <title id="serp-rank-lab-title">SERP ranking data flow: clicks vs money</title>
+        <desc id="serp-rank-lab-desc">Data flow of a flight metasearch SERP lab: ingested measured feeds are fenced off from a modeled SERP layer that turns real route and price pairs into offers; two feasible ranking policies on the same logged information set order those offers by fitted click probability or by fitted click probability times partner commission, position-biased simulated clicks are corrected with inverse-propensity weighting, and the readout shows the offline NDCG@10 and MRR against the money metric revenue per search: ranking by money adds 34.45 percent revenue and costs 16.84 percent of clicks.</desc>
         <defs>
           <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
             <circle cx="11" cy="11" r="0.8" fill="rgba(228,228,231,0.08)"/>
@@ -195,15 +211,15 @@
           <path class="a-muted" d="M360 164 H388" marker-end="url(#arrow)"/>
           <!-- 02 sessions are the only join key into the modeled SERP -->
           <path class="a-muted" d="M484 208 V256" marker-end="url(#arrow)"/>
-          <!-- 03 the modeled reference relevance is what the offline metric scores -->
+          <!-- 03 the modeled reference relevance is what the offline metrics score -->
           <path class="a-muted" d="M580 268 H1048" marker-end="url(#arrow)"/>
-          <!-- 04 offers -> commission-ordered page (far arm, upper lane of the fork) -->
+          <!-- 04 offers -> money-objective page (far arm, upper lane of the fork) -->
           <path class="a-muted" d="M580 300 H916 Q924 300 924 308 V392" marker-end="url(#arrow)"/>
-          <!-- 05 offers -> relevance-ordered page (near arm, lower lane of the fork) -->
+          <!-- 05 offers -> click-objective page (near arm, lower lane of the fork) -->
           <path class="a-muted" d="M580 332 H696 Q704 332 704 340 V392" marker-end="url(#arrow)"/>
-          <!-- 06 the relevance-ordered page is simulated by the click model -->
+          <!-- 06 the click-objective page is simulated by the click model -->
           <path class="a-muted" d="M704 480 V528" marker-end="url(#arrow)"/>
-          <!-- 07 the commission-ordered page is simulated by the same click model -->
+          <!-- 07 the money-objective page is simulated by the same click model -->
           <path class="a-muted" d="M924 480 V492 Q924 500 916 500 H792 Q784 500 784 508 V528" marker-end="url(#arrow)"/>
           <!-- 08 the position-biased click log reaches the estimator -->
           <path class="a-muted" d="M800 572 H828" marker-end="url(#arrow)"/>
@@ -211,8 +227,8 @@
           <path class="a-accent" d="M900 528 V520 Q900 512 908 512 H1136 Q1144 512 1144 504 V480" marker-end="url(#arrow-accent)"/>
 
           <!-- focal label: opaque mask, 8px clear of the stroke -->
-          <rect x="978" y="492" width="88" height="12" rx="2" class="mask"/>
-          <text x="1022" y="501" class="arrow-label">+38% REVENUE</text>
+          <rect x="950" y="492" width="144" height="12" rx="2" class="mask"/>
+          <text x="1022" y="501" class="arrow-label">+34.45% REVENUE · logged</text>
         </g>
 
         <!-- Lane 1 · MEASURED FEEDS -->
@@ -247,24 +263,24 @@
         <text x="1070" y="271" class="tag-txt">NDC</text>
         <text x="1144" y="290" class="node-name">NDCG@10 · MRR</text>
         <text x="1144" y="310" class="node-sub">offline metric</text>
-        <text x="1144" y="328" class="node-tool">1.000 → 0.932</text>
+        <text x="1144" y="328" class="node-tool">NDCG 0.985 → 0.883 · MRR 0.994 → 0.686</text>
 
         <!-- Lane 3 · RANKING MONEY -->
         <rect x="608" y="392" width="192" height="88" rx="6" class="mask"/>
         <rect x="608" y="392" width="192" height="88" rx="6" class="node-box"/>
         <rect x="616" y="398" width="28" height="12" rx="2" class="tag"/>
         <text x="630" y="407" class="tag-txt">REL</text>
-        <text x="704" y="426" class="node-name">Relevance policy</text>
-        <text x="704" y="446" class="node-sub">rank by relevance</text>
-        <text x="704" y="464" class="node-tool">oracle · sees relevance</text>
+        <text x="704" y="426" class="node-name">Click objective</text>
+        <text x="704" y="446" class="node-sub">rank by fitted p̂</text>
+        <text x="704" y="464" class="node-tool">logged · no ground truth</text>
 
         <rect x="828" y="392" width="192" height="88" rx="6" class="mask"/>
         <rect x="828" y="392" width="192" height="88" rx="6" class="node-box"/>
         <rect x="836" y="398" width="28" height="12" rx="2" class="tag"/>
         <text x="850" y="407" class="tag-txt">REV</text>
-        <text x="924" y="426" class="node-name">Revenue policy</text>
-        <text x="924" y="446" class="node-sub">rank by commission</text>
-        <text x="924" y="464" class="node-tool">oracle · sees commission</text>
+        <text x="924" y="426" class="node-name">Revenue objective</text>
+        <text x="924" y="446" class="node-sub">rank by p̂ × commission</text>
+        <text x="924" y="464" class="node-tool">logged · no ground truth</text>
 
         <!-- Focal node: the money metric is the lab's north star -->
         <rect x="1048" y="392" width="192" height="88" rx="6" class="mask"/>
@@ -273,7 +289,7 @@
         <text x="1070" y="407" class="tag-txt tag-txt-accent">MON</text>
         <text x="1144" y="426" class="node-name">revenue / search</text>
         <text x="1144" y="446" class="node-sub">partner commission</text>
-        <text x="1144" y="464" class="node-tool">868.9 → 1,196.6</text>
+        <text x="1144" y="464" class="node-tool">826.56 → 1,111.30 ₽</text>
 
         <!-- Lane 4 · CLICKS ESTIMATE -->
         <rect x="608" y="528" width="192" height="88" rx="6" class="mask"/>
