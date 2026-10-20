@@ -1,0 +1,673 @@
+{
+  "orders": {
+    "service_mix": [
+      {
+        "service": "(none)",
+        "count": 7136,
+        "share": 0.7958956056212357,
+        "refund_share_of_all_orders": 0.026767789426723178
+      },
+      {
+        "service": "notification",
+        "count": 1100,
+        "share": 0.12268570153914789,
+        "refund_share_of_all_orders": 0.026767789426723178
+      },
+      {
+        "service": "changes",
+        "count": 476,
+        "share": 0.05308944902966763,
+        "refund_share_of_all_orders": 0.026767789426723178
+      },
+      {
+        "service": "refund",
+        "count": 240,
+        "share": 0.026767789426723178,
+        "refund_share_of_all_orders": 0.026767789426723178
+      },
+      {
+        "service": "support",
+        "count": 14,
+        "share": 0.0015614543832255187,
+        "refund_share_of_all_orders": 0.026767789426723178
+      }
+    ],
+    "platform_mix": [
+      {
+        "order_platform": "desktop",
+        "count": 3507,
+        "share": 0.3911443229979924
+      },
+      {
+        "order_platform": "ios",
+        "count": 2585,
+        "share": 0.28831139861699756
+      },
+      {
+        "order_platform": "android",
+        "count": 1383,
+        "share": 0.15424938657149231
+      },
+      {
+        "order_platform": "android_web",
+        "count": 531,
+        "share": 0.05922373410662503
+      },
+      {
+        "order_platform": "ios_web",
+        "count": 510,
+        "share": 0.05688155253178675
+      },
+      {
+        "order_platform": "(none)",
+        "count": 433,
+        "share": 0.0482935534240464
+      },
+      {
+        "order_platform": "other",
+        "count": 17,
+        "share": 0.0018960517510595582
+      }
+    ],
+    "geo": [
+      {
+        "origin_country": "RU",
+        "destination_country": "RU",
+        "count": 5849,
+        "share": 0.6523533348204328
+      },
+      {
+        "origin_country": "RU",
+        "destination_country": "TR",
+        "count": 193,
+        "share": 0.02152576399732322
+      },
+      {
+        "origin_country": "RU",
+        "destination_country": "AZ",
+        "count": 182,
+        "share": 0.020298906981931743
+      },
+      {
+        "origin_country": "RU",
+        "destination_country": "KG",
+        "count": 156,
+        "share": 0.017399063127370065
+      },
+      {
+        "origin_country": "RU",
+        "destination_country": "TJ",
+        "count": 154,
+        "share": 0.017175998215480704
+      },
+      {
+        "origin_country": "RU",
+        "destination_country": "UZ",
+        "count": 132,
+        "share": 0.014722284184697747
+      },
+      {
+        "origin_country": "RU",
+        "destination_country": "KZ",
+        "count": 127,
+        "share": 0.014164621904974348
+      },
+      {
+        "origin_country": "RU",
+        "destination_country": "AE",
+        "count": 119,
+        "share": 0.013272362257416908
+      },
+      {
+        "origin_country": "TR",
+        "destination_country": "RU",
+        "count": 119,
+        "share": 0.013272362257416908
+      },
+      {
+        "origin_country": "RU",
+        "destination_country": "AM",
+        "count": 106,
+        "share": 0.01182244033013607
+      }
+    ],
+    "booking_depth": [
+      {
+        "bin_left": 0.066055,
+        "bin_right": 33.0594495,
+        "count": 8181
+      },
+      {
+        "bin_left": 33.0594495,
+        "bin_right": 66.05284400000001,
+        "count": 520
+      },
+      {
+        "bin_left": 66.05284400000001,
+        "bin_right": 99.04623850000002,
+        "count": 150
+      },
+      {
+        "bin_left": 99.04623850000002,
+        "bin_right": 132.039633,
+        "count": 52
+      },
+      {
+        "bin_left": 132.039633,
+        "bin_right": 165.0330275,
+        "count": 24
+      },
+      {
+        "bin_left": 165.0330275,
+        "bin_right": 198.02642200000003,
+        "count": 13
+      },
+      {
+        "bin_left": 198.02642200000003,
+        "bin_right": 231.01981650000002,
+        "count": 8
+      },
+      {
+        "bin_left": 231.01981650000002,
+        "bin_right": 264.013211,
+        "count": 3
+      },
+      {
+        "bin_left": 264.013211,
+        "bin_right": 297.00660550000003,
+        "count": 4
+      },
+      {
+        "bin_left": 297.00660550000003,
+        "bin_right": 330.0,
+        "count": 11
+      }
+    ],
+    "price_stats": [
+      {
+        "order_price_count": 8966.0,
+        "order_price_mean": 22124.069726250724,
+        "order_price_std": 22530.30667814937,
+        "order_price_min": 598.559374,
+        "order_price_25%": 8607.123529249999,
+        "order_price_50%": 15363.055972499998,
+        "order_price_75%": 27207.886403999997,
+        "order_price_max": 311419.04834,
+        "service_price_count": 1830.0,
+        "service_price_mean": 908.8234972677595,
+        "service_price_std": 1224.5758543094385,
+        "service_price_min": 149.0,
+        "service_price_25%": 299.0,
+        "service_price_50%": 499.0,
+        "service_price_75%": 699.0,
+        "service_price_max": 6518.0,
+        "service_profit_count": 1830.0,
+        "service_profit_mean": 703.7168579234973,
+        "service_profit_std": 854.4306928186954,
+        "service_profit_min": 119.2,
+        "service_profit_25%": 271.79,
+        "service_profit_50%": 399.2,
+        "service_profit_75%": 635.39,
+        "service_profit_max": 4445.28,
+        "service_profit_median_labelled": 399.2,
+        "service_profit_labelled_share": 0.2041043943787642,
+        "note": "service_profit median=399.2 on the 20% of orders that carry a service (399.2 over all rows, because the rest are zero)"
+      }
+    ]
+  },
+  "routes": {
+    "airlines": [
+      {
+        "airline": "DP",
+        "count": 40776,
+        "share": 0.2975351341885206
+      },
+      {
+        "airline": "SU",
+        "count": 20996,
+        "share": 0.15320403368212132
+      },
+      {
+        "airline": "FV",
+        "count": 19994,
+        "share": 0.14589261999620565
+      },
+      {
+        "airline": "5N",
+        "count": 15680,
+        "share": 0.11441413831852079
+      },
+      {
+        "airline": "UT",
+        "count": 8108,
+        "share": 0.059162616931541234
+      },
+      {
+        "airline": "U6",
+        "count": 7991,
+        "share": 0.05830888898617982
+      },
+      {
+        "airline": "N4",
+        "count": 7859,
+        "share": 0.05734570874013105
+      },
+      {
+        "airline": "S7",
+        "count": 7491,
+        "share": 0.05466047896326781
+      },
+      {
+        "airline": "Y7",
+        "count": 1885,
+        "share": 0.013754505786378296
+      },
+      {
+        "airline": "XT",
+        "count": 1456,
+        "share": 0.010624169986719787
+      },
+      {
+        "airline": "6R",
+        "count": 1120,
+        "share": 0.008172438451322914
+      },
+      {
+        "airline": "EY",
+        "count": 964,
+        "share": 0.0070341345241743645
+      },
+      {
+        "airline": "WY",
+        "count": 901,
+        "share": 0.006574434861287451
+      },
+      {
+        "airline": "MU",
+        "count": 412,
+        "share": 0.0030062898588795
+      },
+      {
+        "airline": "3U",
+        "count": 324,
+        "share": 0.0023641696948469857
+      },
+      {
+        "airline": "A4",
+        "count": 277,
+        "share": 0.0020212191526932564
+      },
+      {
+        "airline": "HU",
+        "count": 178,
+        "share": 0.0012988339681566773
+      },
+      {
+        "airline": "CA",
+        "count": 166,
+        "share": 0.001211272127606789
+      },
+      {
+        "airline": "FM",
+        "count": 138,
+        "share": 0.001006961166323716
+      },
+      {
+        "airline": "EO",
+        "count": 85,
+        "share": 0.0006202297038950425
+      },
+      {
+        "airline": "F7",
+        "count": 76,
+        "share": 0.0005545583234826262
+      },
+      {
+        "airline": "QR",
+        "count": 76,
+        "share": 0.0005545583234826262
+      },
+      {
+        "airline": "IO",
+        "count": 54,
+        "share": 0.0003940282824744976
+      },
+      {
+        "airline": "WZ",
+        "count": 39,
+        "share": 0.0002845759817871372
+      }
+    ],
+    "routes": [
+      {
+        "origin": "SVO",
+        "destination": "LED",
+        "count": 59354,
+        "share": 0.4330954569998395,
+        "connection_share": 0.011222509230477358,
+        "baggage_share": 0.14641799103950498
+      },
+      {
+        "origin": "VKO",
+        "destination": "LED",
+        "count": 52926,
+        "share": 0.3861914977452826,
+        "connection_share": 0.011222509230477358,
+        "baggage_share": 0.14641799103950498
+      },
+      {
+        "origin": "DME",
+        "destination": "LED",
+        "count": 18996,
+        "share": 0.13861039359047328,
+        "connection_share": 0.011222509230477358,
+        "baggage_share": 0.14641799103950498
+      },
+      {
+        "origin": "SVO",
+        "destination": "HKT",
+        "count": 2694,
+        "share": 0.019657633203449938,
+        "connection_share": 0.011222509230477358,
+        "baggage_share": 0.14641799103950498
+      },
+      {
+        "origin": "AUH",
+        "destination": "HKT",
+        "count": 468,
+        "share": 0.003414911781445646,
+        "connection_share": 0.011222509230477358,
+        "baggage_share": 0.14641799103950498
+      },
+      {
+        "origin": "SVO",
+        "destination": "AUH",
+        "count": 468,
+        "share": 0.003414911781445646,
+        "connection_share": 0.011222509230477358,
+        "baggage_share": 0.14641799103950498
+      },
+      {
+        "origin": "MCT",
+        "destination": "HKT",
+        "count": 432,
+        "share": 0.003152226259795981,
+        "connection_share": 0.011222509230477358,
+        "baggage_share": 0.14641799103950498
+      },
+      {
+        "origin": "SVO",
+        "destination": "MCT",
+        "count": 432,
+        "share": 0.003152226259795981,
+        "connection_share": 0.011222509230477358,
+        "baggage_share": 0.14641799103950498
+      },
+      {
+        "origin": "SVO",
+        "destination": "TFU",
+        "count": 168,
+        "share": 0.001225865767698437,
+        "connection_share": 0.011222509230477358,
+        "baggage_share": 0.14641799103950498
+      },
+      {
+        "origin": "TFU",
+        "destination": "HKT",
+        "count": 168,
+        "share": 0.001225865767698437,
+        "connection_share": 0.011222509230477358,
+        "baggage_share": 0.14641799103950498
+      }
+    ],
+    "monthly": [
+      {
+        "booking_month": 1,
+        "legs": 13264,
+        "share": 0.09678502108780994
+      },
+      {
+        "booking_month": 2,
+        "legs": 10833,
+        "share": 0.07904645155641171
+      },
+      {
+        "booking_month": 3,
+        "legs": 12992,
+        "share": 0.0948002860353458
+      },
+      {
+        "booking_month": 4,
+        "legs": 14596,
+        "share": 0.10650438538884754
+      },
+      {
+        "booking_month": 5,
+        "legs": 20206,
+        "share": 0.14743954584592034
+      },
+      {
+        "booking_month": 6,
+        "legs": 22458,
+        "share": 0.16387198458911606
+      },
+      {
+        "booking_month": 7,
+        "legs": 21990,
+        "share": 0.1604570728076704
+      },
+      {
+        "booking_month": 8,
+        "legs": 20707,
+        "share": 0.1510952526888782
+      }
+    ],
+    "passengers": [
+      {
+        "passengers": 1,
+        "count": 107168,
+        "share": 0.7819856106708696
+      },
+      {
+        "passengers": 2,
+        "count": 24032,
+        "share": 0.1753571793412431
+      },
+      {
+        "passengers": 3,
+        "count": 4051,
+        "share": 0.029559418005633144
+      },
+      {
+        "passengers": 4,
+        "count": 1329,
+        "share": 0.009697473840900136
+      },
+      {
+        "passengers": 5,
+        "count": 298,
+        "share": 0.002174452373655561
+      },
+      {
+        "passengers": 6,
+        "count": 110,
+        "share": 0.0008026502050406433
+      },
+      {
+        "passengers": 7,
+        "count": 28,
+        "share": 0.00020431096128307284
+      },
+      {
+        "passengers": 8,
+        "count": 15,
+        "share": 0.00010945230068736045
+      },
+      {
+        "passengers": 9,
+        "count": 15,
+        "share": 0.00010945230068736045
+      }
+    ]
+  },
+  "clickstream_ab": {
+    "balance": [
+      {
+        "source": "events",
+        "ab_group": "A",
+        "users": 2500,
+        "srm_chi2": 0.0,
+        "srm_p_value": 1.0
+      },
+      {
+        "source": "events",
+        "ab_group": "B",
+        "users": 2500,
+        "srm_chi2": 0.0,
+        "srm_p_value": 1.0
+      },
+      {
+        "source": "sessions",
+        "ab_group": "A",
+        "users": 2500,
+        "srm_chi2": 0.0,
+        "srm_p_value": 1.0
+      },
+      {
+        "source": "sessions",
+        "ab_group": "B",
+        "users": 2500,
+        "srm_chi2": 0.0,
+        "srm_p_value": 1.0
+      }
+    ],
+    "per_user": [
+      {
+        "metric": "events_per_user",
+        "ab_group": "A",
+        "mean": 8.8512,
+        "median": 6.0
+      },
+      {
+        "metric": "events_per_user",
+        "ab_group": "B",
+        "mean": 8.976,
+        "median": 6.0
+      },
+      {
+        "metric": "sessions_per_user",
+        "ab_group": "A",
+        "mean": 2.0164,
+        "median": 2.0
+      },
+      {
+        "metric": "sessions_per_user",
+        "ab_group": "B",
+        "mean": 2.0248,
+        "median": 2.0
+      }
+    ],
+    "dau": [
+      {
+        "pdate": "2023-05-01",
+        "ab_group": "A",
+        "dau": 1044
+      },
+      {
+        "pdate": "2023-05-01",
+        "ab_group": "B",
+        "dau": 1090
+      },
+      {
+        "pdate": "2023-05-02",
+        "ab_group": "A",
+        "dau": 1273
+      },
+      {
+        "pdate": "2023-05-02",
+        "ab_group": "B",
+        "dau": 1258
+      },
+      {
+        "pdate": "2023-05-03",
+        "ab_group": "A",
+        "dau": 1179
+      },
+      {
+        "pdate": "2023-05-03",
+        "ab_group": "B",
+        "dau": 1177
+      },
+      {
+        "pdate": "2023-05-04",
+        "ab_group": "A",
+        "dau": 174
+      },
+      {
+        "pdate": "2023-05-04",
+        "ab_group": "B",
+        "dau": 177
+      },
+      {
+        "pdate": "2023-05-05",
+        "ab_group": "A",
+        "dau": 117
+      },
+      {
+        "pdate": "2023-05-05",
+        "ab_group": "B",
+        "dau": 119
+      },
+      {
+        "pdate": "2023-05-06",
+        "ab_group": "A",
+        "dau": 57
+      },
+      {
+        "pdate": "2023-05-06",
+        "ab_group": "B",
+        "dau": 66
+      },
+      {
+        "pdate": "2023-05-07",
+        "ab_group": "A",
+        "dau": 71
+      },
+      {
+        "pdate": "2023-05-07",
+        "ab_group": "B",
+        "dau": 51
+      },
+      {
+        "pdate": "2023-05-08",
+        "ab_group": "A",
+        "dau": 61
+      },
+      {
+        "pdate": "2023-05-08",
+        "ab_group": "B",
+        "dau": 50
+      }
+    ]
+  },
+  "modeled": {
+    "label": "modeled \u2014 serp_offers is synthetic, not measured",
+    "offers": 120136,
+    "searches": 12000,
+    "partners": 8,
+    "funnel_positions": 15,
+    "top_position_revenue_share": 0.47346591076067424,
+    "divergence": {
+      "ndcg_k": 10,
+      "ndcg_relevance": 1.0,
+      "ndcg_revenue": 0.9315723731890515,
+      "revenue_per_search_relevance": 868.8691221268126,
+      "revenue_per_search_revenue": 1196.5930037072626,
+      "ndcg_delta": 0.06842762681094852,
+      "revenue_delta": -327.7238815804499,
+      "ndcg_rises_while_revenue_falls": true,
+      "label": "modeled",
+      "note": "both reference policies read the simulator's ground truth; this gap is the constructed ceiling (src/serp_sim.py:57-61), not a shippable result"
+    }
+  }
+}

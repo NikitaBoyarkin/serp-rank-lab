@@ -102,12 +102,12 @@ def load_bookings(path: Path | str | None = None) -> pd.DataFrame:
     Returns a leg-level frame carrying all booking-level fields denormalised,
     plus ``is_connection`` (leg_index > 0) and ``has_baggage``.
 
-    Data quality: the leg JSON is *ragged*. Across the 137,082 real legs, 1,679
-    carry no ``origin``, 1,696 no ``destination``, 1,679 no ``airline`` and 1,772
-    no ``baggage`` key. Those fields are therefore cast to nullable ``string``
-    (``pd.NA``) rather than dropped or imputed, so downstream counts stay honest.
-    ``baggage`` alone falls back to ``"No baggage"`` because ``has_baggage`` is a
-    boolean flag that must not be nullable.
+    Data quality: the leg JSON is *ragged*. A subset of real legs carries no
+    ``origin``, no ``destination``, no ``airline`` or no ``baggage`` key at all.
+    Those fields are therefore cast to nullable ``string`` (``pd.NA``) rather than
+    dropped or imputed, so downstream counts stay honest. ``baggage`` alone falls
+    back to ``"No baggage"`` because ``has_baggage`` is a boolean flag that must
+    not be nullable.
     """
     path = _resolve("bookings", path)
     bookings = pd.read_csv(path)

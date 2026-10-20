@@ -33,10 +33,8 @@ def main() -> None:
     orders = load("orders")
     sessions = load("sessions")
     events = load("events")
-    legs = load("bookings_legs")
     pq = load("partner_quality")
     fbp = load("funnel_by_position")
-    rbp = load("revenue_by_position")
     rps = load("revenue_per_search")
     sf = load("search_funnel")
 

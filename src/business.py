@@ -48,7 +48,9 @@ def orders_metrics(orders: pd.DataFrame) -> dict[str, pd.DataFrame]:
         service.value_counts(dropna=False).rename_axis("service").reset_index(name="count")
     )
     service_mix["share"] = service_mix["count"] / n
-    service_mix["refund_rate"] = float((orders["service"] == "refund").mean())
+    # A share of ALL orders, not a per-service rate: repeating one number on every
+    # row made it read as "refund rate of this service type".
+    service_mix["refund_share_of_all_orders"] = float((orders["service"] == "refund").mean())
 
     platform_mix = (
         orders["order_platform"]
@@ -76,11 +78,18 @@ def orders_metrics(orders: pd.DataFrame) -> dict[str, pd.DataFrame]:
     metrics = ["order_price", "service_price", "service_profit"]
     desc = orders[metrics].describe()
     row = {f"{col}_{stat}": float(desc.loc[stat, col]) for col in metrics for stat in desc.index}
-    profit_median = float(orders["service_profit"].median())
+    # service_profit is zero on unlabelled rows, so the all-rows median is ~0 and
+    # says nothing. Report it on the rows that actually carry a service instead.
+    paid = orders.loc[orders["service"].notna(), "service_profit"]
+    profit_median_paid = float(paid.median()) if len(paid) else float("nan")
+    profit_median_all = float(orders["service_profit"].median())
     labelled = float(orders["service"].notna().mean())
+    row["service_profit_median_labelled"] = profit_median_paid
+    row["service_profit_labelled_share"] = labelled
     row["note"] = (
-        f"service_profit median={profit_median:.1f} (~0); "
-        f"service labelled on {labelled:.0%} of orders"
+        f"service_profit median={profit_median_paid:.1f} on the {labelled:.0%} of "
+        f"orders that carry a service ({profit_median_all:.1f} over all rows, "
+        f"because the rest are zero)"
     )
     price_stats = pd.DataFrame([row])
 

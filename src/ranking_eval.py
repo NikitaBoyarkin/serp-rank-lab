@@ -74,6 +74,9 @@ import pandas as pd
 from src.policies import (
     DEFAULT_POLICIES,
     DELTA_POLICY,
+    FEASIBLE_POLICIES,
+    INFORMATION_SET,
+    ORACLE_POLICIES,
     POLICIES,
     REALISTIC_POLICIES,
     PolicyContext,
@@ -95,6 +98,18 @@ from src.serp_sim import (
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 REPORTS_DIR = PROJECT_ROOT / "reports"
 REPORT_JSON = REPORTS_DIR / "ranking_eval.json"
+HEADLINE_JSON = REPORTS_DIR / "headline.json"
+
+#: Seed of the simulator that produced ``serp_offers.parquet`` (``SimConfig.seed``).
+#: The parquet does not carry it, so it is stated here and echoed into the report.
+SIM_SEED = 42
+#: Relevance threshold that defines a "relevant" item for MRR.
+MRR_THRESHOLD = 0.5
+
+#: The four policies in ``headline.json``: the feasible pair, the shipped order
+#: and the trivial price baseline. Oracles are appended separately as the
+#: "ceiling (modeled)" block and never enter ``policies``/``headline``.
+HEADLINE_POLICIES = (*FEASIBLE_POLICIES, "production", "price_asc")
 
 
 # --------------------------------------------------------------------------- #
@@ -204,7 +219,7 @@ def ndcg_at_k(relevances: np.ndarray | list[float], k: int) -> float:
     return dcg / idcg if idcg > 0 else 0.0
 
 
-def mrr(relevances: np.ndarray | list[float], threshold: float = 0.5) -> float:
+def mrr(relevances: np.ndarray | list[float], threshold: float = MRR_THRESHOLD) -> float:
     """Reciprocal rank of the first item with ``relevance >= threshold``."""
     for rank, rel in enumerate(np.asarray(relevances, dtype=float), start=1):
         if rel >= threshold:
@@ -232,6 +247,26 @@ def _offer_arrays(frame: pd.DataFrame, ctx: PolicyContext) -> tuple[np.ndarray, 
     return frame["relevance"].to_numpy(dtype=float), rev_engaged(frame, ctx)
 
 
+def _engagement_rates(frame: pd.DataFrame, ctx: PolicyContext) -> np.ndarray:
+    """Per-row ``P(redirect | click) * P(book | redirect)`` from the contract.
+
+    Contract quantities only (``redirect_rate`` / ``book_rate`` per partner), so
+    the expected-booking metric below is computable for *any* policy without
+    touching the logged outcomes. The simulator's price-sensitivity adjustment
+    (``redirect_price_sens`` / ``book_price_sens``) is deliberately not applied
+    here: it is a modelling detail of ``serp_sim``, and re-implementing it in the
+    evaluator would make the two definitions drift apart.
+    """
+    return np.array(
+        [
+            float(ctx.partner_by_name[str(p)]["redirect_rate"])
+            * float(ctx.partner_by_name[str(p)]["book_rate"])
+            for p in frame["partner"]
+        ],
+        dtype=float,
+    )
+
+
 def _expected_metrics(
     order: np.ndarray, rel: np.ndarray, rev: np.ndarray, eta: float
 ) -> tuple[float, float]:
@@ -246,6 +281,13 @@ def _expected_metrics(
     return float((p_click * rev[order]).sum()), float(p_click.sum())
 
 
+def _expected_bookings(order: np.ndarray, rel: np.ndarray, rates: np.ndarray, eta: float) -> float:
+    """Expected bookings per search: ``sum_k P(examine at k) * rel_k * engage_rate_k``."""
+    order = np.asarray(order, dtype=int)
+    e = np.array([examination_prob(k, eta) for k in range(1, len(order) + 1)], dtype=float)
+    return float((e * rel[order] * rates[order]).sum())
+
+
 def compare_rankings(
     offers_df: pd.DataFrame,
     k: int = 10,
@@ -254,12 +296,13 @@ def compare_rankings(
     eta_mobile: float = ETA_MOBILE,
     eta_desktop: float = ETA_DESKTOP,
 ) -> pd.DataFrame:
-    """Policy table: NDCG@k and expected revenue per search, one row per policy.
+    """Policy table: NDCG@k, MRR, expected revenue per search, one row per policy.
 
     Every policy re-ranks the *same* offer set within each search, so the
-    comparison is apples to apples. NDCG@k is the offline metric; expected revenue
-    per search is the online one. A ``delta_relevance_minus_revenue`` row is
-    appended whenever both references are present.
+    comparison is apples to apples. NDCG@k and MRR are the offline metrics;
+    expected revenue per search is the online one. A
+    ``delta_relevance_minus_revenue`` row is appended whenever both references
+    are present.
 
     Defaults to the two Phase 2 reference policies. The realistic rankers are
     opt-in because they need ``partner_type``/``examine_prob`` columns and fitted
@@ -270,18 +313,25 @@ def compare_rankings(
     if (eta_mobile, eta_desktop) != (ctx.eta_mobile, ctx.eta_desktop):
         ctx = replace(ctx, eta_mobile=eta_mobile, eta_desktop=eta_desktop)
 
-    totals = {name: {"ndcg": 0.0, "revenue": 0.0, "clicks": 0.0} for name in names}
+    totals = {
+        name: {"ndcg": 0.0, "mrr": 0.0, "revenue": 0.0, "clicks": 0.0, "bookings": 0.0}
+        for name in names
+    }
     n_searches = 0
     for _, group in offers_df.groupby("search_id", sort=True):
         frame = search_frame(group)
         eta = ctx.eta(str(frame["device"].iloc[0]))
         rel, rev = _offer_arrays(frame, ctx)
+        rates = _engagement_rates(frame, ctx)
         for name in names:
             order = np.asarray(POLICIES[name](frame, ctx), dtype=int)
-            totals[name]["ndcg"] += ndcg_at_k(rel[order], k)
+            ranked = rel[order]
+            totals[name]["ndcg"] += ndcg_at_k(ranked, k)
+            totals[name]["mrr"] += mrr(ranked, threshold=MRR_THRESHOLD)
             revenue, clicks = _expected_metrics(order, rel, rev, eta)
             totals[name]["revenue"] += revenue
             totals[name]["clicks"] += clicks
+            totals[name]["bookings"] += _expected_bookings(order, rel, rates, eta)
         n_searches += 1
 
     if n_searches == 0:
@@ -291,8 +341,10 @@ def compare_rankings(
         {
             "policy": name,
             "ndcg_at_k": totals[name]["ndcg"] / n_searches,
+            "mrr": totals[name]["mrr"] / n_searches,
             "revenue_per_search": totals[name]["revenue"] / n_searches,
             "clicks_per_search": totals[name]["clicks"] / n_searches,
+            "bookings_per_search": totals[name]["bookings"] / n_searches,
         }
         for name in names
     ]
@@ -301,11 +353,16 @@ def compare_rankings(
             {
                 "policy": DELTA_POLICY,
                 "ndcg_at_k": (totals["relevance"]["ndcg"] - totals["revenue"]["ndcg"]) / n_searches,
+                "mrr": (totals["relevance"]["mrr"] - totals["revenue"]["mrr"]) / n_searches,
                 "revenue_per_search": (
                     totals["relevance"]["revenue"] - totals["revenue"]["revenue"]
                 )
                 / n_searches,
                 "clicks_per_search": (totals["relevance"]["clicks"] - totals["revenue"]["clicks"])
+                / n_searches,
+                "bookings_per_search": (
+                    totals["relevance"]["bookings"] - totals["revenue"]["bookings"]
+                )
                 / n_searches,
             }
         )
@@ -519,6 +576,175 @@ def interleaving_experiment(
 
 
 # --------------------------------------------------------------------------- #
+# Headline report -- reports/headline.json (the single source of numbers)
+# --------------------------------------------------------------------------- #
+
+
+def breakeven_rub_per_forgone_click(
+    delta_revenue_per_search: float, delta_clicks_per_search: float
+) -> float | None:
+    """``dRevenue_per_search / dClicks_per_search`` -- the price of a click.
+
+    Signed, and the sign is information: a revenue gain bought with forgone
+    clicks gives ``negative`` (numerator up, denominator down), so ``|value|``
+    is rubles of revenue per *lost* click while the sign says in which direction
+    the trade went. ``None`` when the click count does not move -- the ratio is
+    undefined and any number would be invented.
+
+    Converting a click into money needs an external rate (LTV, brand risk) that
+    these data do not contain, so this is a *rate*, not a verdict.
+    """
+    if delta_clicks_per_search == 0:
+        return None
+    return float(delta_revenue_per_search) / float(delta_clicks_per_search)
+
+
+def _git_commit(root: Path = PROJECT_ROOT) -> str:
+    """Short HEAD sha read from ``.git`` directly -- no subprocess, no git CLI."""
+    gitdir = root / ".git"
+    head = gitdir / "HEAD"
+    if not head.exists():
+        return "unknown"
+    ref = head.read_text(encoding="utf-8").strip()
+    if not ref.startswith("ref:"):
+        return ref[:12]
+    target = gitdir / ref.split(":", 1)[1].strip()
+    if target.exists():
+        return target.read_text(encoding="utf-8").strip()[:12]
+    packed = gitdir / "packed-refs"
+    if packed.exists():
+        for line in packed.read_text(encoding="utf-8").splitlines():
+            parts = line.split()
+            if len(parts) == 2 and parts[1] == ref.split(":", 1)[1].strip():
+                return parts[0][:12]
+    return "unknown"
+
+
+def policy_scorecard(offers_df: pd.DataFrame, ctx: PolicyContext, k: int = 10) -> pd.DataFrame:
+    """Per-policy headline metrics, derived from one :func:`compare_rankings` pass.
+
+    Adds the two rates the schema asks for on top of the raw totals:
+
+    * ``ctr`` -- expected clicks / impressions, i.e. the *observed* click-through
+      rate a user produces under that policy's own display order (position bias
+      included on purpose: it is the UX the user actually experiences);
+    * ``conversion`` -- expected bookings / expected clicks (click -> booking).
+
+    Both are expectations under the simulator's click model, not realised
+    outcomes, so they are comparable across policies without re-drawing the
+    simulation.
+    """
+    names = (*HEADLINE_POLICIES, *ORACLE_POLICIES, "propensity_logistic")
+    names = tuple(dict.fromkeys(names))
+    table = compare_rankings(offers_df, k=k, policies=names, ctx=ctx).set_index("policy")
+
+    offers_per_search = float(offers_df.groupby("search_id").size().mean())
+    out = pd.DataFrame(
+        {
+            "ctr": table["clicks_per_search"] / offers_per_search,
+            "revenue_per_search": table["revenue_per_search"],
+            "ndcg_at_k": table["ndcg_at_k"],
+            "mrr": table["mrr"],
+            "conversion": table["bookings_per_search"] / table["clicks_per_search"],
+            "clicks_per_search": table["clicks_per_search"],
+        }
+    )
+    return out
+
+
+def headline_report(
+    offers_df: pd.DataFrame,
+    ctx: PolicyContext,
+    *,
+    k: int = 10,
+    searches: int | None = None,
+    seed: int = SIM_SEED,
+    commit: str | None = None,
+) -> dict:
+    """Build ``reports/headline.json`` (PRD §1.1) from a scored offer frame.
+
+    Contract rules enforced here rather than in prose:
+
+    * ``policies`` holds only ``logged`` policies; an oracle name is a bug, so it
+      raises instead of quietly shipping;
+    * ``headline`` is the feasible pair only -- ``revenue_objective`` minus
+      ``ctr_objective`` -- with the breakeven rate from :func:`breakeven...`;
+    * the oracle pair appears *only* under ``ceiling_oracle``, labelled
+      ``modeled``.
+    """
+    card = policy_scorecard(offers_df, ctx, k=k)
+
+    for name in HEADLINE_POLICIES:
+        if INFORMATION_SET[name] != "logged":
+            raise ValueError(f"{name!r} is {INFORMATION_SET[name]!r}, not 'logged'")
+        if name in ORACLE_POLICIES:
+            raise ValueError(f"oracle policy {name!r} must not enter the headline block")
+
+    def cell(name: str, column: str) -> float:
+        return float(card.loc[name, column])
+
+    revenue_delta_abs = cell("revenue_objective", "revenue_per_search") - cell(
+        "ctr_objective", "revenue_per_search"
+    )
+    clicks_delta_abs = cell("revenue_objective", "clicks_per_search") - cell(
+        "ctr_objective", "clicks_per_search"
+    )
+    ctr_delta_abs = cell("revenue_objective", "ctr") - cell("ctr_objective", "ctr")
+
+    learned = cell("propensity_logistic", "revenue_per_search")
+    price = cell("price_asc", "revenue_per_search")
+    learned_loses = bool(learned < price)
+
+    return {
+        "generated_from": {
+            "searches": int(searches if searches is not None else offers_df["search_id"].nunique()),
+            "seed": int(seed),
+            "commit": commit if commit is not None else _git_commit(),
+        },
+        "policies": {
+            name: {
+                "ctr": cell(name, "ctr"),
+                "revenue_per_search": cell(name, "revenue_per_search"),
+                "ndcg_at_10": cell(name, "ndcg_at_k"),
+                "conversion": cell(name, "conversion"),
+                "information_set": INFORMATION_SET[name],
+            }
+            for name in HEADLINE_POLICIES
+        },
+        "headline": {
+            "revenue_per_search_delta_abs": revenue_delta_abs,
+            "revenue_per_search_delta_rel": revenue_delta_abs
+            / cell("ctr_objective", "revenue_per_search"),
+            "ctr_delta_abs": ctr_delta_abs,
+            "ctr_delta_rel": ctr_delta_abs / cell("ctr_objective", "ctr"),
+            "breakeven_rub_per_forgone_click": breakeven_rub_per_forgone_click(
+                revenue_delta_abs, clicks_delta_abs
+            ),
+            "clicks_per_search_delta_abs": clicks_delta_abs,
+            "information_set": "logged",
+        },
+        "ceiling_oracle": {
+            "revenue_per_search": cell("revenue", "revenue_per_search"),
+            "label": "modeled",
+            "note": (
+                "affinity/price_index anti-correlation is a modelling assumption "
+                "(src/serp_sim.py:57-61); the oracle-pair gap is the constructed "
+                "ceiling, not a shippable result"
+            ),
+        },
+        "failed_hypothesis": {
+            "learned_ranker": learned,
+            "price_asc": price,
+            "statement": (
+                "learned ranker loses to price sorting"
+                if learned_loses
+                else "learned ranker beats price sorting"
+            ),
+        },
+    }
+
+
+# --------------------------------------------------------------------------- #
 # CLI
 # --------------------------------------------------------------------------- #
 
@@ -609,6 +835,11 @@ def main(argv: list[str] | None = None) -> int:
         "ndcg_rises_while_revenue_falls": bool(
             cell(DELTA_POLICY, "ndcg_at_k") > 0 and cell(DELTA_POLICY, "revenue_per_search") < 0
         ),
+        "label": "modeled",
+        "note": (
+            "both reference policies read the simulator's ground truth; this gap is the "
+            "constructed ceiling (src/serp_sim.py:57-61), not a shippable result"
+        ),
     }
 
     # The point of the realistic rankers: the divergence is not an artefact of
@@ -634,15 +865,25 @@ def main(argv: list[str] | None = None) -> int:
         sensitivity = sensitivity_sweep(offers, k=args.k, ctx=ctx)
         tilt_note = f"money_tilt axis skipped ({type(exc).__name__}: {exc})"
 
+    headline = headline_report(test, ctx, k=args.k, searches=int(offers["search_id"].nunique()))
+    hl = headline["headline"]
+    hp = headline["policies"]
+
     report = {
         "k": args.k,
         "offers": int(len(offers)),
         "searches": int(offers["search_id"].nunique()),
         "train_searches": int(train["search_id"].nunique()),
         "test_searches": int(test["search_id"].nunique()),
+        "mrr_threshold": MRR_THRESHOLD,
+        "mrr_by_policy": {str(row["policy"]): float(row["mrr"]) for _, row in summary.iterrows()},
         "logged_revenue_per_search": logged_revenue,
         "policies": summary.to_dict(orient="records"),
         "divergence": divergence,
+        # The §1.1 payload is mirrored here so that reading ``ranking_eval.json``
+        # alone already shows the headline; ``reports/headline.json`` stays the
+        # canonical copy.
+        "headline": headline,
         "realistic_policies": realistic,
         "sensitivity": sensitivity,
         "ctr": {
@@ -659,6 +900,7 @@ def main(argv: list[str] | None = None) -> int:
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     REPORT_JSON.write_text(json.dumps(_to_native(report), indent=2), encoding="utf-8")
+    HEADLINE_JSON.write_text(json.dumps(_to_native(headline), indent=2), encoding="utf-8")
 
     print(summary.to_string(index=False, float_format=lambda x: f"{x:,.4f}"))
     print()
@@ -690,6 +932,35 @@ def main(argv: list[str] | None = None) -> int:
             f"revenue/search={row['revenue_per_search']:,.2f}"
         )
     print()
+    print("--- headline: feasible pair, one information set ---")
+    for name in HEADLINE_POLICIES:
+        row = hp[name]
+        print(
+            f"{name:<20} ctr={row['ctr']:.4f}  revenue/search={row['revenue_per_search']:,.2f}  "
+            f"NDCG@{args.k}={row['ndcg_at_10']:.4f}  conv={row['conversion']:.4f}"
+        )
+    print(
+        f"delta (revenue_objective - ctr_objective): "
+        f"revenue {hl['revenue_per_search_delta_abs']:+,.2f}/search "
+        f"({hl['revenue_per_search_delta_rel']:+.1%})   "
+        f"ctr {hl['ctr_delta_abs']:+.4f} ({hl['ctr_delta_rel']:+.1%})   "
+        f"clicks {hl['clicks_per_search_delta_abs']:+.4f}/search"
+    )
+    be = hl["breakeven_rub_per_forgone_click"]
+    print(
+        "breakeven: "
+        + ("undefined (Δclicks = 0)" if be is None else f"{be:+,.2f} RUB per forgone click")
+    )
+    print(
+        f"ceiling (modeled, oracle pair): revenue/search="
+        f"{headline['ceiling_oracle']['revenue_per_search']:,.2f}"
+    )
+    print(
+        f"failed hypothesis: learned={headline['failed_hypothesis']['learned_ranker']:,.2f} vs "
+        f"price_asc={headline['failed_hypothesis']['price_asc']:,.2f} -> "
+        f"{headline['failed_hypothesis']['statement']}"
+    )
+    print()
     print("--- does the divergence survive the model's own parameters? ---")
     for row in sensitivity["eta"]:
         print(
@@ -711,6 +982,7 @@ def main(argv: list[str] | None = None) -> int:
         f"A={inter['win_rate_a']:.3f} B={inter['win_rate_b']:.3f}"
     )
     print(f"\nwritten: {REPORT_JSON}")
+    print(f"written: {HEADLINE_JSON}")
     return 0
 
 

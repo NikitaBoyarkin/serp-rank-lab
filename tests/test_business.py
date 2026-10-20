@@ -96,7 +96,8 @@ def test_orders_service_mix_shares_sum_to_one():
 
 def test_orders_refund_rate_is_share_of_refund_orders():
     mix = orders_metrics(_orders())["service_mix"]
-    assert mix["refund_rate"].iloc[0] == pytest.approx(0.4)
+    # A share of all orders, named so it cannot read as a per-service rate.
+    assert mix["refund_share_of_all_orders"].iloc[0] == pytest.approx(0.4)
 
 
 def test_orders_platform_mix_counts_ios():
@@ -127,6 +128,18 @@ def test_orders_price_stats_reports_profit_and_label_note():
     note = stats["note"].iloc[0]
     assert "service_profit median" in note
     assert "80%" in note
+
+
+def test_orders_price_note_quotes_the_real_profit_median():
+    """A hardcoded "(~0)" must fail here: the fixture's paid rows are not zero."""
+    orders = _orders()
+    # Labelled rows (0, 1, 3, 4) carry 100 / 250 / 380 / 400 -> median 315.
+    orders["service_profit"] = [100.0, 250.0, 0.0, 380.0, 400.0]
+    stats = orders_metrics(orders)["price_stats"]
+    note = stats["note"].iloc[0]
+    assert "315.0" in note
+    assert "(~0)" not in note
+    assert stats["service_profit_median_labelled"].iloc[0] == pytest.approx(315.0)
 
 
 # --------------------------------------------------------------------------- #

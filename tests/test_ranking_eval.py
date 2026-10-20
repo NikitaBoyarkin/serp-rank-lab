@@ -15,6 +15,7 @@ determinism, and a SQL <-> pandas revenue cross-check.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import duckdb
@@ -22,13 +23,18 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from src.policies import context_for, train_test_split_searches
 from src.ranking_eval import (
+    REPORT_JSON,
+    breakeven_rub_per_forgone_click,
     compare_rankings,
     estimate_propensity_em,
+    headline_report,
     interleaving_experiment,
     mrr,
     naive_ctr,
     ndcg_at_k,
+    policy_scorecard,
     team_draft_interleaving,
     unbiased_ctr,
 )
@@ -120,6 +126,25 @@ def test_mrr_matches_hand_computed_values():
     assert mrr([0.1, 0.9, 0.2], threshold=0.5) == pytest.approx(0.5)  # rank 2
     assert mrr([0.9], threshold=0.5) == pytest.approx(1.0)  # rank 1
     assert mrr([0.1, 0.2], threshold=0.5) == pytest.approx(0.0)  # none relevant
+
+
+def test_mrr_is_part_of_every_policy_row():
+    """MRR is computed, not promised (REQ-T04 #1).
+
+    On the hand-built SERP the relevance policy puts the only relevant offer
+    (0.9) first -> MRR 1.0; the revenue policy puts it second -> MRR 0.5.
+    """
+    table = compare_rankings(_two_offer_search(), k=2).set_index("policy")
+    assert "mrr" in table.columns
+    assert float(table.loc["relevance", "mrr"]) == pytest.approx(1.0)
+    assert float(table.loc["revenue", "mrr"]) == pytest.approx(0.5)
+
+
+@pytest.mark.skipif(not REPORT_JSON.exists(), reason="needs reports/ranking_eval.json")
+def test_the_committed_report_carries_mrr_per_policy():
+    payload = json.loads(REPORT_JSON.read_text(encoding="utf-8"))
+    assert "mrr_by_policy" in payload
+    assert {"relevance", "price_asc"} <= set(payload["mrr_by_policy"])
 
 
 # --------------------------------------------------------------------------- #
@@ -216,6 +241,61 @@ def test_relevance_policy_has_the_highest_ndcg_by_construction():
         by_policy.loc["revenue", "revenue_per_search"]
         > by_policy.loc["relevance", "revenue_per_search"]
     )
+
+
+# --------------------------------------------------------------------------- #
+# Breakeven: the price of a forgone click
+# --------------------------------------------------------------------------- #
+
+
+def test_breakeven_is_the_signed_ratio_of_the_two_deltas():
+    """``breakeven = dRevenue_per_search / dClicks_per_search``, sign included."""
+    assert breakeven_rub_per_forgone_click(10.0, -5.0) == pytest.approx(-2.0)
+    assert breakeven_rub_per_forgone_click(-10.0, 5.0) == pytest.approx(-2.0)
+    assert breakeven_rub_per_forgone_click(10.0, 5.0) == pytest.approx(2.0)
+    assert breakeven_rub_per_forgone_click(-10.0, -5.0) == pytest.approx(2.0)
+    assert breakeven_rub_per_forgone_click(0.0, -5.0) == pytest.approx(0.0)
+
+
+def test_breakeven_sign_agrees_with_the_signs_of_both_deltas():
+    for delta_rev, delta_clicks in ((10.0, -5.0), (-10.0, 5.0), (10.0, 5.0), (-10.0, -5.0)):
+        value = breakeven_rub_per_forgone_click(delta_rev, delta_clicks)
+        assert value is not None
+        assert (value > 0) == (np.sign(delta_rev) == np.sign(delta_clicks))
+
+
+def test_breakeven_is_undefined_when_no_click_is_forgone():
+    """No denominator, no number: returning a big figure would be an invention."""
+    assert breakeven_rub_per_forgone_click(10.0, 0.0) is None
+
+
+def test_headline_breakeven_is_recomputable_from_the_report_itself(tiny_routes):
+    """The JSON must carry enough to check the rate, not just state it."""
+    offers = simulate_serps(tiny_routes, ["u1", "u2", "u3"], SimConfig(seed=11, n_searches=120))
+    train, test = train_test_split_searches(offers, test_frac=0.5, seed=0)
+    ctx = context_for(test, train=train)
+
+    payload = headline_report(test, ctx, k=10, commit="0" * 12)
+    hl = payload["headline"]
+
+    assert hl["clicks_per_search_delta_abs"] != 0
+    assert hl["breakeven_rub_per_forgone_click"] == pytest.approx(
+        hl["revenue_per_search_delta_abs"] / hl["clicks_per_search_delta_abs"]
+    )
+    assert np.sign(hl["breakeven_rub_per_forgone_click"]) == np.sign(
+        hl["revenue_per_search_delta_abs"]
+    ) * np.sign(hl["clicks_per_search_delta_abs"])
+    assert hl["information_set"] == "logged"
+    assert payload["generated_from"]["searches"] == test["search_id"].nunique()
+
+
+def test_conversion_metric_is_reported_for_every_policy(tiny_routes):
+    """``conversion`` is bookings per click, so it is a rate in (0, 1]."""
+    offers = simulate_serps(tiny_routes, ["u1", "u2"], SimConfig(seed=12, n_searches=80))
+    ctx = context_for(offers, train=offers)
+    card = policy_scorecard(offers, ctx, k=10)
+    assert "conversion" in card.columns
+    assert ((card["conversion"] > 0) & (card["conversion"] <= 1)).all()
 
 
 # --------------------------------------------------------------------------- #

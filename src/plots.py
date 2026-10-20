@@ -94,16 +94,32 @@ def plot_partner_quadrant(partner_quality_df: pd.DataFrame):
 
 
 def plot_ranking_divergence(ranking_report: dict):
-    """NDCG@k and revenue per search side by side, by ranking policy."""
+    """NDCG@k and revenue per search side by side, by ranking policy.
+
+    The ``delta_relevance_minus_revenue`` row is a **difference**, not a policy: it
+    has no NDCG of its own and a negative revenue by construction. Drawing it as a
+    bar put a phantom policy on the axis, so it is filtered out and reported as a
+    text annotation instead.
+    """
     policies = ranking_report["policies"]
-    names = [p["policy"] for p in policies]
+    real = [p for p in policies if not str(p["policy"]).startswith("delta")]
+    delta = next((p for p in policies if str(p["policy"]).startswith("delta")), None)
+
+    names = [p["policy"] for p in real]
     fig, axes = plt.subplots(1, 2, figsize=(10, 3.6))
-    axes[0].bar(names, [p["ndcg_at_k"] for p in policies])
+    axes[0].bar(names, [p["ndcg_at_k"] for p in real])
     axes[0].set_title("NDCG@k by policy")
     axes[0].tick_params(axis="x", rotation=20)
-    axes[1].bar(names, [p["revenue_per_search"] for p in policies])
+    axes[1].bar(names, [p["revenue_per_search"] for p in real])
     axes[1].set_title("Revenue per search by policy")
     axes[1].tick_params(axis="x", rotation=20)
+
+    if delta is not None:
+        fig.suptitle(
+            f"Δ relevance − revenue (a difference, not a policy): "
+            f"NDCG {delta['ndcg_at_k']:+.4f}, revenue {delta['revenue_per_search']:+,.2f} ₽",
+            fontsize=9,
+        )
     return fig
 
 
@@ -116,7 +132,7 @@ def plot_sensitivity_sweep(ranking_report: dict):
     axes[0].plot(tilt["money_tilt"], tilt["logged_ndcg_at_k"], marker="o")
     axes[0].set_xlabel("money tilt")
     axes[0].set_ylabel("NDCG@10")
-    axes[0].set_title("Money tilt: NDCG falls while revenue rises")
+    axes[0].set_title("Money tilt: NDCG falls, revenue is not monotone")
     tilt_axis = axes[0].twinx()
     tilt_axis.plot(
         tilt["money_tilt"],

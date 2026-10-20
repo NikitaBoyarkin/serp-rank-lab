@@ -25,14 +25,34 @@ policy                       sees relevance  role
 ===========================  ==============  ==================================
 ``relevance``                yes             oracle reference (NDCG = 1.0)
 ``revenue``                  yes             revenue-optimal reference
+``production``               no              the logged (shipped) display order
 ``price_asc``                no              trivial realistic baseline
 ``click_trained``            no              logistic click model on raw logs
 ``propensity_logistic``      no              same model, IPW-weighted logs
+``ctr_objective``            no              feasible: rank by fitted click prob
+``revenue_objective``        no              feasible: fitted click prob x money
 ===========================  ==============  ==================================
 
-The last two share one fitter and differ only in the sample weights, which makes
-them a controlled pair: the only thing that changes is whether the position bias
-in the training signal is corrected.
+``click_trained`` / ``propensity_logistic`` share one fitter and differ only in
+the sample weights, which makes them a controlled pair: the only thing that
+changes is whether the position bias in the training signal is corrected.
+
+``ctr_objective`` / ``revenue_objective`` are the *feasible pair* the headline
+compares. They are deliberately built as one experiment with two objectives:
+
+* **one training set** -- the IPW-corrected fit (``propensity_logistic``), the
+  bias-corrected one; both policies read the *same* ``beta``;
+* **one feature matrix** -- :func:`click_features`, i.e. ``[1, log price ratio,
+  is_cpc]``, all of it observable before a slot is assigned;
+* **one slot mechanism** -- :func:`_greedy_slot_assignment`, the same
+  ``examine_prob(k)`` greedy used by :func:`revenue`.
+
+So the only difference between them is the utility: ``p_hat`` versus
+``p_hat * revenue_if_engaged``. Neither reads ``relevance``, ``click_prob`` or
+``expected_revenue``; the money term comes from the partner *contract*
+(rate / cpc / redirect / book rates, see
+:func:`src.serp_sim.revenue_if_engaged`). Any revenue gap between them is
+therefore attributable to the objective, not to privileged information.
 
 No scikit-learn: the fit is L-BFGS on a weighted Bernoulli log-likelihood via
 ``scipy.optimize``, ~30 lines.
@@ -94,6 +114,32 @@ def _search_seed(frame: pd.DataFrame, ctx: PolicyContext) -> int:
     return int(zlib.crc32(f"{ctx.seed}|{sid}".encode()))
 
 
+def _greedy_slot_assignment(
+    frame: pd.DataFrame, ctx: PolicyContext, utility: np.ndarray
+) -> np.ndarray:
+    """Greedy slot assignment: for slot ``k`` pick ``argmax examine_prob(k) * utility``.
+
+    This is *the* slot mechanism of the module: :func:`revenue`,
+    :func:`ctr_objective` and :func:`revenue_objective` all go through it, so
+    they differ in the utility only -- never in how attention decay is handled.
+    Deterministic: ties break on the lowest row index.
+    """
+    eta = ctx.eta(str(frame["device"].iloc[0]))
+    utility = np.asarray(utility, dtype=float)
+    remaining = list(range(len(frame)))
+    order: list[int] = []
+    for pos in range(1, len(frame) + 1):
+        e = examination_prob(pos, eta)
+        best_i, best_v = -1, -np.inf
+        for i in remaining:
+            v = e * float(utility[i])
+            if best_i < 0 or v > best_v + 1e-12:
+                best_i, best_v = i, v
+        remaining.remove(best_i)
+        order.append(best_i)
+    return np.array(order, dtype=int)
+
+
 # --------------------------------------------------------------------------- #
 # Reference policies -- built from the simulator's ground truth
 # --------------------------------------------------------------------------- #
@@ -110,21 +156,8 @@ def revenue(frame: pd.DataFrame, ctx: PolicyContext) -> np.ndarray:
     For slot ``k`` pick the offer maximising ``P(examine at k) * relevance *
     revenue_if_engaged``. Deterministic: ties break on the row index.
     """
-    eta = ctx.eta(str(frame["device"].iloc[0]))
     rel = frame["relevance"].to_numpy(dtype=float)
-    rev = rev_engaged(frame, ctx)
-    remaining = list(range(len(frame)))
-    order: list[int] = []
-    for pos in range(1, len(frame) + 1):
-        e = examination_prob(pos, eta)
-        best_i, best_v = -1, -1.0
-        for i in remaining:
-            v = e * rel[i] * rev[i]
-            if best_i < 0 or v > best_v + 1e-12:
-                best_i, best_v = i, v
-        remaining.remove(best_i)
-        order.append(best_i)
-    return np.array(order)
+    return _greedy_slot_assignment(frame, ctx, rel * rev_engaged(frame, ctx))
 
 
 # --------------------------------------------------------------------------- #
@@ -135,6 +168,22 @@ def revenue(frame: pd.DataFrame, ctx: PolicyContext) -> np.ndarray:
 def price_asc(frame: pd.DataFrame, ctx: PolicyContext) -> np.ndarray:
     """Cheapest offer first. The baseline a naive team ships."""
     return np.lexsort((np.arange(len(frame)), frame["price"].to_numpy(dtype=float)))
+
+
+def production(frame: pd.DataFrame, ctx: PolicyContext) -> np.ndarray:
+    """The shipped display order: the identity permutation of the logged SERP.
+
+    ``serp_offers.position`` *is* the money-tilted blend the product shipped, so
+    re-displaying it unchanged is the "do nothing" arm. Consults no column at
+    all -- it is the cleanest possible ``logged`` information set.
+
+    Caveat worth stating wherever this arm is quoted: the blend that produced the
+    logged order was built *from the simulator's* ``relevance``. Re-displaying it
+    needs no truth, so the arm is legitimate; but its quality is lent by a
+    modelling input a real product would not have, so "the new ranker loses to
+    production" is partly an artefact of the simulation, not a production fact.
+    """
+    return np.arange(len(frame), dtype=int)
 
 
 def click_features(frame: pd.DataFrame) -> np.ndarray:
@@ -238,22 +287,106 @@ def propensity_logistic(frame: pd.DataFrame, ctx: PolicyContext) -> np.ndarray:
 
 
 # --------------------------------------------------------------------------- #
+# The feasible pair -- one fit, one feature matrix, one slot mechanism
+# --------------------------------------------------------------------------- #
+
+#: The one fitted model both feasible policies are built on. Chosen deliberately:
+#: it is the IPW-corrected fit (sample weight ``1 / examine_prob``), i.e. the one
+#: whose price coefficient is not confounded by position bias. Using the naive
+#: fit would import a known bias into a "what would shipping this cost" number.
+FITTED_MODEL = "propensity_logistic"
+
+
+def fitted_click_probability(frame: pd.DataFrame, ctx: PolicyContext) -> np.ndarray:
+    """``p_hat`` -- the fitted click probability of each offer, position excluded.
+
+    Same matrix as both feasible policies and as the trained ranker
+    (:func:`click_features`), same ``beta`` and therefore one shared number per
+    offer. If the coefficients are missing this raises instead of silently
+    falling back to a different model.
+    """
+    beta = ctx.params.get(FITTED_MODEL)
+    if beta is None:
+        raise ValueError(
+            f"ctx.params['{FITTED_MODEL}'] is missing; run fit_click_models() "
+            "and build the context with context_for(..., train=train)"
+        )
+    z = click_features(frame) @ np.asarray(beta, dtype=float)
+    return np.asarray(1.0 / (1.0 + np.exp(-z)), dtype=float)
+
+
+def ctr_objective(frame: pd.DataFrame, ctx: PolicyContext) -> np.ndarray:
+    """FEASIBLE: rank by ``p_hat`` -- maximise clicks, ignore the money.
+
+    Reads ``partner_type`` and ``price`` only (through :func:`click_features`).
+    The slot mechanism is :func:`_greedy_slot_assignment`, identical to
+    :func:`revenue`.
+
+    Because ``examine_prob(k)`` is common to every candidate within a slot, this
+    greedy reduces to sorting by ``p_hat`` -- and ``p_hat`` is a monotone function
+    of the fitted linear score, so the resulting order coincides with
+    :func:`propensity_logistic`. That is an identity, not a duplication: the CTR
+    objective *is* the bias-corrected learned ranker, now stated with the same slot
+    mechanism as the money objective it is compared against.
+    """
+    return _greedy_slot_assignment(frame, ctx, fitted_click_probability(frame, ctx))
+
+
+def revenue_objective(frame: pd.DataFrame, ctx: PolicyContext) -> np.ndarray:
+    """FEASIBLE: rank by ``p_hat * revenue_if_engaged`` -- maximise money.
+
+    The money term is the *contract* value of an engaged click
+    (:func:`rev_engaged`: CPA ``rate * price * redirect * book``, CPC ``cpc``),
+    not the simulator's ``expected_revenue``. Identical ``X``, identical
+    ``beta`` and identical slot mechanism as :func:`ctr_objective`; the utility
+    is the only difference, which is what makes the revenue/CTR trade-off
+    attributable to the objective.
+    """
+    utility = fitted_click_probability(frame, ctx) * rev_engaged(frame, ctx)
+    return _greedy_slot_assignment(frame, ctx, utility)
+
+
+# --------------------------------------------------------------------------- #
 # Registry
 # --------------------------------------------------------------------------- #
 
 POLICIES: dict[str, Callable[[pd.DataFrame, PolicyContext], np.ndarray]] = {
     "relevance": relevance,
     "revenue": revenue,
+    "production": production,
     "price_asc": price_asc,
     "click_trained": click_trained,
     "propensity_logistic": propensity_logistic,
+    "ctr_objective": ctr_objective,
+    "revenue_objective": revenue_objective,
 }
+
+#: What each policy is allowed to know. ``oracle`` = built from the simulator's
+#: ground truth (``relevance`` / ``expected_revenue``) and therefore unusable as
+#: a headline; ``logged`` = only columns a production ranker has at serving time.
+INFORMATION_SET: dict[str, str] = {
+    "relevance": "oracle",
+    "revenue": "oracle",
+    "production": "logged",
+    "price_asc": "logged",
+    "click_trained": "logged",
+    "propensity_logistic": "logged",
+    "ctr_objective": "logged",
+    "revenue_objective": "logged",
+}
+
+# The two policies the headline compares: same information, different objective.
+FEASIBLE_POLICIES = ("ctr_objective", "revenue_objective")
+#: The reference whose number is the "ceiling" appendix (+38% in the old README).
+ORACLE_POLICIES = ("relevance", "revenue")
 
 # The oracle pair. ``compare_rankings`` defaults to these so a caller with a
 # bare offer frame still gets the Phase 2 headline; the realistic policies need
 # ``partner_type`` / ``examine_prob`` / a fitted model, so they are opt-in.
-DEFAULT_POLICIES = ("relevance", "revenue")
-REALISTIC_POLICIES = ("price_asc", "click_trained", "propensity_logistic")
+# ``DEFAULT_POLICIES`` stays on the oracles on purpose: it is what the
+# "ceiling (modeled)" appendix reproduces, never the headline.
+DEFAULT_POLICIES = ORACLE_POLICIES
+REALISTIC_POLICIES = ("production", "price_asc", "click_trained", "propensity_logistic")
 DELTA_POLICY = "delta_relevance_minus_revenue"
 
 

@@ -6,15 +6,17 @@ Seven pages, built with the modern ``st.navigation`` / ``st.Page`` API:
 
 * **Funnel** -- search -> click -> redirect -> buy on the results page.
 * **Revenue by position** -- the decay of revenue per search down the page.
-* **Ranking policies** -- the NDCG-vs-revenue divergence from Phase 2.
+* **Ranking policies** -- the feasible pair (same information set, revenue vs CTR), the
+  exchange rate per forgone click, and the reference oracles behind a `modeled` label.
 * **Position bias & partners** -- the examine-probability curve by position
   (mobile vs desktop) and the partner CTR-vs-commission quadrant.
 * **Ancillary & refunds** -- the measured order mix, refunds, booking depth and
   price/profit stats.
 * **Supply & routes** -- measured airlines, top routes, seasonality and the
   passenger mix.
-* **Experiment** -- the Phase 3 A/B readout (SRM, A/A, ratio metric, CUPED,
-  peeking, sample size) plus a measured clickstream A/B tab.
+* **Experiment** -- the rollout readout, verdict first (decision + guardrails), then
+  primary metric, power, heterogeneity, SRM, A/A, ratio metric, CUPED, peeking and
+  sample size, plus a measured clickstream A/B tab.
 
 Data is read from ``data/processed/`` and ``reports/`` and cached with
 ``@st.cache_data``. Pages over ``serp_offers`` / ``ranking_eval.json`` are
@@ -40,6 +42,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 SERP_OFFERS = PROJECT_ROOT / "data" / "processed" / "serp_offers.parquet"
 PARTNER_QUALITY = PROJECT_ROOT / "data" / "processed" / "partner_quality.parquet"
 RANKING_JSON = PROJECT_ROOT / "reports" / "ranking_eval.json"
+HEADLINE_JSON = PROJECT_ROOT / "reports" / "headline.json"
 EXPERIMENT_JSON = PROJECT_ROOT / "reports" / "experiment.json"
 
 
@@ -191,7 +194,82 @@ def page_revenue_by_position() -> None:
 
 
 def page_ranking_policies() -> None:
-    st.title("Ranking policies: relevance vs revenue")
+    st.title("Ranking policies: the price of ranking by money")
+
+    headline = load_json(str(HEADLINE_JSON))
+    if headline is not None:
+        hl = headline["headline"]
+        st.markdown(
+            "Two **feasible** policies on the *same* information set (one feature matrix, one "
+            "`beta`, one greedy slot mechanism). Only the utility differs: fitted click "
+            "probability vs fitted click probability x commission. The exchange rate below is "
+            "what the decision turns on."
+        )
+        c1, c2, c3 = st.columns(3)
+        c1.metric(
+            "revenue / search delta",
+            f"{hl['revenue_per_search_delta_abs']:+,.2f}",
+            delta=f"{hl['revenue_per_search_delta_rel']:+.2%}",
+        )
+        c2.metric(
+            "CTR delta",
+            f"{hl['ctr_delta_abs']:+.4f}",
+            delta=f"{hl['ctr_delta_rel']:+.2%}",
+        )
+        c3.metric(
+            "breakeven ₽ / forgone click",
+            f"{abs(hl['breakeven_rub_per_forgone_click']):,.2f}",
+            help="An exchange rate, not a verdict: the value of a click (LTV, brand) is not in the data.",
+        )
+
+        rows = [
+            {
+                "policy": name,
+                "information_set": cell["information_set"],
+                "ctr": cell["ctr"],
+                "revenue_per_search": cell["revenue_per_search"],
+                "ndcg_at_10": cell["ndcg_at_10"],
+                "conversion": cell["conversion"],
+            }
+            for name, cell in headline["policies"].items()
+        ]
+        frame = pd.DataFrame(rows)
+        st.dataframe(
+            frame,
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "ctr": st.column_config.NumberColumn(format="%.4f"),
+                "revenue_per_search": st.column_config.NumberColumn(format="%.2f"),
+                "ndcg_at_10": st.column_config.NumberColumn(format="%.4f"),
+                "conversion": st.column_config.NumberColumn(format="%.4f"),
+            },
+        )
+
+        fig, axes = plt.subplots(1, 2, figsize=(10, 3.4))
+        axes[0].bar(frame["policy"], frame["ctr"], color="#3d8bb5")
+        axes[0].set_title("CTR (clicks / impressions)")
+        axes[1].bar(frame["policy"], frame["revenue_per_search"], color="#b5651d")
+        axes[1].set_title("revenue per search (₽)")
+        for ax in axes:
+            ax.tick_params(axis="x", rotation=15)
+        fig.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
+
+        failed = headline["failed_hypothesis"]
+        st.info(
+            f"**Hypothesis not confirmed:** the learned ranker earns "
+            f"{failed['learned_ranker']:,.2f} ₽/search against {failed['price_asc']:,.2f} ₽ for "
+            f"plain price sorting — {failed['learned_ranker'] - failed['price_asc']:+,.2f} ₽. "
+            "A one-variable policy beats the learned one."
+        )
+        ceiling = headline["ceiling_oracle"]
+        st.caption(
+            f"Modeled ceiling (oracle pair): {ceiling['revenue_per_search']:,.2f} ₽/search, "
+            f"label `{ceiling['label']}`. Not a shippable result."
+        )
+
     report = load_json(str(RANKING_JSON))
     if report is None:
         st.warning(
@@ -202,10 +280,10 @@ def page_ranking_policies() -> None:
     policies = pd.DataFrame(report["policies"])
     divergence = report["divergence"]
 
+    st.subheader("Reference oracles: better offline is not better online")
     st.markdown(
-        "The headline result: a ranking that is **better offline** (higher NDCG@k) can be "
-        "**worse online** (lower revenue per search). NDCG and revenue disagree because the "
-        "money-rich partners quote slightly higher prices and rank slightly worse on relevance."
+        "The two reference policies read the simulator's ground truth, so this pair is a "
+        "**modeled** statement about the objective, not about a shippable ranker."
     )
     c1, c2 = st.columns(2)
     c1.metric("NDCG delta (relevance - revenue)", f"{divergence['ndcg_delta']:+.4f}")
@@ -348,7 +426,7 @@ def page_ancillary() -> None:
     depth = pd.DataFrame(orders["booking_depth"])
     price_stats = pd.DataFrame(orders["price_stats"])
 
-    refund_rate = float(service_mix["refund_rate"].iloc[0])
+    refund_rate = float(service_mix["refund_share_of_all_orders"].iloc[0])
     c1, c2, c3 = st.columns(3)
     c1.metric("orders", f"{int(service_mix['count'].sum()):,}")
     c2.metric("refund rate", f"{refund_rate:.1%}")
@@ -467,22 +545,162 @@ def page_experiment() -> None:
             f"cuped={report['seeds']['cuped']} peek={report['seeds']['peek']}"
         )
 
+        # Decision first: the readout exists to produce one verdict.
+        decision = report["decision"]
+        if decision["verdict"] == "do_not_ship":
+            st.error(
+                f"**Verdict: `{decision['verdict']}`** — {decision['reason']}. "
+                f"Stopping rule: {decision['stopping_rule']}."
+            )
+        else:
+            st.success(f"**Verdict: `{decision['verdict']}`** — {decision['reason']}.")
+
+        primary = report["primary"]
+        st.subheader("1. Primary metric: revenue per search")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("control (production)", f"{primary['control']['revenue_per_search']:,.2f} ₽")
+        c2.metric(
+            "test (revenue_objective)",
+            f"{primary['test']['revenue_per_search']:,.2f} ₽",
+            delta=f"{primary['diff_rel']:+.2%}",
+        )
+        c3.metric(
+            "p-value (cluster: user_id)",
+            f"{primary['p_value']:.4f}",
+            delta="significant" if primary["significant"] else "not significant",
+        )
+        st.write(
+            f"Δ = **{primary['diff_abs']:+,.2f} ₽** per search; 95% CI "
+            f"[{primary['ci_low_rel']:+.2%}; {primary['ci_high_rel']:+.2%}]; "
+            f"SE = {primary['se']:,.2f}. Definition: `{primary['definition']}`."
+        )
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "arm": "control",
+                        "policy": report["arms"]["control"]["policy"],
+                        "users": report["arms"]["control"]["n_users"],
+                        "searches": report["arms"]["control"]["n_searches"],
+                        "revenue_per_search": report["arms"]["control"]["revenue_per_search"],
+                    },
+                    {
+                        "arm": "test",
+                        "policy": report["arms"]["test"]["policy"],
+                        "users": report["arms"]["test"]["n_users"],
+                        "searches": report["arms"]["test"]["n_searches"],
+                        "revenue_per_search": report["arms"]["test"]["revenue_per_search"],
+                    },
+                ]
+            ),
+            width="stretch",
+            hide_index=True,
+        )
+
+        treatment = report["arms"]["treatment_check"]
+        st.caption(
+            "Treatment check: "
+            f"{treatment['share_of_searches_reranked']:.1%} of searches re-ranked, "
+            f"{treatment['share_of_offers_moved']:.1%} of offers moved, "
+            f"mean |position change| = {treatment['mean_abs_position_change']:.2f}."
+        )
+
+        st.subheader("2. Guardrails (a breach blocks the rollout)")
+        guardrails = report["guardrails"]
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "guardrail": g["label"],
+                        "control": g["control"],
+                        "test": g["test"],
+                        "delta_%": g["diff_rel"] * 100,
+                        "p_value": g["p_value"],
+                        "harmful_direction": g["harmful_direction"],
+                        "breach": g["breach"],
+                    }
+                    for g in guardrails.values()
+                ]
+            ),
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "delta_%": st.column_config.NumberColumn(format="%.2f"),
+                "p_value": st.column_config.NumberColumn(format="%.3g"),
+            },
+        )
+        st.caption(decision["changes_our_mind"])
+
+        st.subheader("3. Power: why this effect is hard to detect at real traffic")
+        power = report["power"]
+        c1, c2, c3 = st.columns(3)
+        c1.metric(
+            "MDE, this run",
+            f"{power['run']['mde_rel']:.2%}",
+            help=power["run"]["label"],
+        )
+        c2.metric(
+            "MDE, real traffic",
+            f"{power['at_real_traffic']['mde_rel']:.2%}",
+            help=power["at_real_traffic"]["label"],
+        )
+        c3.metric(
+            "MDE, 60k scenario",
+            f"{power['at_scenario_60000']['mde_rel']:.2%}",
+            help=power["at_scenario_60000"]["label"],
+        )
+        required = power["required_n_per_arm"]
+        st.write(
+            f"Observed effect {required['observed_effect_rel']:+.2%} would need "
+            f"**{required['n_per_arm_users']:,.0f} users per arm** at 80% power. "
+            f"At the live 90/10 split: {power['required_n_at_planned_split']['n_control_users']:,.0f} "
+            f"control / {power['required_n_at_planned_split']['n_test_users']:,.0f} test."
+        )
+
+        st.subheader("4. Heterogeneity by device (CTR only)")
+        het = report["heterogeneity"]
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "device": row["device"],
+                        "control": row["control"],
+                        "test": row["test"],
+                        "delta_%": row["diff_rel"] * 100,
+                        "ci_low_%": row["ci_low_rel"] * 100,
+                        "ci_high_%": row["ci_high_rel"] * 100,
+                        "p_value_bh": row["p_value_bh"],
+                        "significant_bh": row["significant_bh"],
+                    }
+                    for row in het["by_device"]
+                ]
+            ),
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "delta_%": st.column_config.NumberColumn(format="%.2f"),
+                "ci_low_%": st.column_config.NumberColumn(format="%.2f"),
+                "ci_high_%": st.column_config.NumberColumn(format="%.2f"),
+            },
+        )
+        st.caption(het["revenue_note"])
+
         srm = report["srm"]
-        st.subheader("1. Sample ratio mismatch")
+        st.subheader("5. Sample ratio mismatch")
         c1, c2, c3 = st.columns(3)
         c1.metric("observed test share", f"{srm['observed_test_share']:.4f}")
         c2.metric("SRM p (vs planned 90/10)", f"{srm['vs_planned']['p_value']:.4f}")
         c3.metric("SRM p (vs assumed 50/50)", f"{srm['vs_fifty_fifty']['p_value']:.2e}")
 
         aa = report["aa_test"]
-        st.subheader("2. A/A test")
+        st.subheader("6. A/A test")
         st.write(
             f"Control split in two: p = **{aa['p_value']:.3f}** -> "
             f"non-significant = **{aa['non_significant']}**"
         )
 
         ratio = report["ratio_metric"]
-        st.subheader("3. Ratio metric: naive per-user vs delta method")
+        st.subheader("7. Ratio metric: naive per-user vs delta method")
         c1, c2 = st.columns(2)
         c1.metric(
             "delta method p",
@@ -497,7 +715,7 @@ def page_experiment() -> None:
         st.write(f"SE ratio (naive / delta) = **{ratio['se_ratio_naive_over_delta']:.3f}**")
 
         cuped = report["cuped"]
-        st.subheader("4. CUPED variance reduction")
+        st.subheader("8. CUPED variance reduction")
         st.dataframe(
             pd.DataFrame(
                 {
@@ -507,7 +725,7 @@ def page_experiment() -> None:
                         cuped["real"]["corr_x_y"],
                         cuped["positive_control"]["corr_x_y"],
                     ],
-                    "variance reduction %": [
+                    "variance reduction % (corr^2)": [
                         cuped["real"]["variance_reduction_pct"],
                         cuped["positive_control"]["variance_reduction_pct"],
                     ],
@@ -520,22 +738,29 @@ def page_experiment() -> None:
             width="stretch",
             hide_index=True,
         )
+        st.caption(cuped["interpretation"]["real"])
 
         peek = report["peeking"]
-        st.subheader("5. Peeking: fixed-horizon vs always-valid")
-        c1, c2 = st.columns(2)
+        st.subheader("9. Peeking: fixed-horizon vs always-valid")
+        c1, c2, c3 = st.columns(3)
         c1.metric(
             "fixed-horizon FPR",
             f"{peek['naive_peeking_fpr']:.1%}",
             delta=f"nominal {peek['alpha']:.0%}",
         )
         c2.metric("mSPRT always-valid FPR", f"{peek['msprt_always_valid_fpr']:.1%}")
+        c3.metric("looks used", f"{peek['n_batches']} of {peek['n_batches_requested']}")
+        st.caption(
+            f"mSPRT never crossed in {peek['n_sims']} A/A streams x {peek['n_batches']} looks; "
+            f"looks are capped at arm size "
+            f"({peek['arm_users']} users / batch {peek['batch_size']}), so no interim is duplicated."
+        )
         peeking_png = PROJECT_ROOT / "reports" / "peeking.png"
         if peeking_png.exists():
             st.image(str(peeking_png))
 
         sizing = report["sample_size"]
-        st.subheader("6. Required sample size")
+        st.subheader("10. Required sample size")
         c1, c2, c3 = st.columns(3)
         c1.metric("baseline revenue/search", f"{sizing['baseline_rps']:,.1f}")
         c2.metric("n needed (90/10)", f"{sizing['planned']['n_total']:,.0f}")
@@ -616,4 +841,5 @@ pages = [
     st.Page(page_experiment, title="Experiment", icon=":material/science:"),
 ]
 
-st.navigation(pages).run()
+if __name__ == "__main__":
+    st.navigation(pages).run()

@@ -1,5 +1,11 @@
 # EDA — serp-rank-lab (SERP ranking & monetisation)
 
+> [!warning]
+> **Отчёт снят на предыдущей версии данных (13.10.2026).** Числа ниже — исторический
+> профиль того прогона; актуальные значения живут в `reports/headline.json` (headline-пара,
+> Δвыручки/ΔCTR, breakeven), `reports/experiment.json` (раскатка, guardrails, power) и
+> `reports/ranking_eval.json` (политики, MRR, свипы). При расхождении верить JSON.
+
 > [!summary]
 > Разведочный анализ обработанного слоя `serp-rank-lab`: 6 parquet-таблиц, из них первичная —
 > `serp_offers.parquet` (120,136 показов предложений). Данные чистые по структуре (0 полных

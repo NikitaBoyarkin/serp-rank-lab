@@ -1,0 +1,294 @@
+{
+  "k": 10,
+  "offers": 120136,
+  "searches": 12000,
+  "train_searches": 6000,
+  "test_searches": 6000,
+  "mrr_threshold": 0.5,
+  "mrr_by_policy": {
+    "relevance": 1.0,
+    "revenue": 0.9758271164021164,
+    "production": 0.960240013227513,
+    "price_asc": 0.993736111111111,
+    "click_trained": 0.996861111111111,
+    "propensity_logistic": 0.9944027777777776,
+    "ctr_objective": 0.9944027777777776,
+    "revenue_objective": 0.6861353174603211,
+    "delta_relevance_minus_revenue": 0.02417288359788366
+  },
+  "logged_revenue_per_search": 1225.6273659938952,
+  "policies": [
+    {
+      "policy": "relevance",
+      "ndcg_at_k": 1.0,
+      "mrr": 1.0,
+      "revenue_per_search": 868.8691221268126,
+      "clicks_per_search": 1.7601903620060926,
+      "bookings_per_search": 0.3833259959424242
+    },
+    {
+      "policy": "revenue",
+      "ndcg_at_k": 0.9315723731890515,
+      "mrr": 0.9758271164021164,
+      "revenue_per_search": 1196.5930037072626,
+      "clicks_per_search": 1.5919540475404548,
+      "bookings_per_search": 0.31988890362428557
+    },
+    {
+      "policy": "production",
+      "ndcg_at_k": 0.9480498486821912,
+      "mrr": 0.960240013227513,
+      "revenue_per_search": 1175.795622574908,
+      "clicks_per_search": 1.6344340627299616,
+      "bookings_per_search": 0.33936114435980574
+    },
+    {
+      "policy": "price_asc",
+      "ndcg_at_k": 0.9850353987472102,
+      "mrr": 0.993736111111111,
+      "revenue_per_search": 843.912315804453,
+      "clicks_per_search": 1.7227570413895932,
+      "bookings_per_search": 0.3625584950009549
+    },
+    {
+      "policy": "click_trained",
+      "ndcg_at_k": 0.9822912048301428,
+      "mrr": 0.996861111111111,
+      "revenue_per_search": 692.9775560047289,
+      "clicks_per_search": 1.7127514366062706,
+      "bookings_per_search": 0.3551114175335043
+    },
+    {
+      "policy": "propensity_logistic",
+      "ndcg_at_k": 0.985043389069013,
+      "mrr": 0.9944027777777776,
+      "revenue_per_search": 826.5600861465134,
+      "clicks_per_search": 1.7224964486068588,
+      "bookings_per_search": 0.36202195197645287
+    },
+    {
+      "policy": "ctr_objective",
+      "ndcg_at_k": 0.985043389069013,
+      "mrr": 0.9944027777777776,
+      "revenue_per_search": 826.5600861465134,
+      "clicks_per_search": 1.7224964486068588,
+      "bookings_per_search": 0.36202195197645287
+    },
+    {
+      "policy": "revenue_objective",
+      "ndcg_at_k": 0.8826869608081014,
+      "mrr": 0.6861353174603211,
+      "revenue_per_search": 1111.2959788145017,
+      "clicks_per_search": 1.4324908505899518,
+      "bookings_per_search": 0.2644293230653759
+    },
+    {
+      "policy": "delta_relevance_minus_revenue",
+      "ndcg_at_k": 0.06842762681094852,
+      "mrr": 0.02417288359788366,
+      "revenue_per_search": -327.7238815804499,
+      "clicks_per_search": 0.16823631446563803,
+      "bookings_per_search": 0.06343709231813868
+    }
+  ],
+  "divergence": {
+    "ndcg_k": 10,
+    "ndcg_relevance": 1.0,
+    "ndcg_revenue": 0.9315723731890515,
+    "revenue_per_search_relevance": 868.8691221268126,
+    "revenue_per_search_revenue": 1196.5930037072626,
+    "ndcg_delta": 0.06842762681094852,
+    "revenue_delta": -327.7238815804499,
+    "ndcg_rises_while_revenue_falls": true,
+    "label": "modeled",
+    "note": "both reference policies read the simulator's ground truth; this gap is the constructed ceiling (src/serp_sim.py:57-61), not a shippable result"
+  },
+  "headline": {
+    "generated_from": {
+      "searches": 12000,
+      "seed": 42,
+      "commit": "31a5e0f24d27"
+    },
+    "policies": {
+      "ctr_objective": {
+        "ctr": 0.1726005994128253,
+        "revenue_per_search": 826.5600861465134,
+        "ndcg_at_10": 0.985043389069013,
+        "conversion": 0.21017282924980965,
+        "information_set": "logged"
+      },
+      "revenue_objective": {
+        "ctr": 0.1435409516607053,
+        "revenue_per_search": 1111.2959788145017,
+        "ndcg_at_10": 0.8826869608081014,
+        "conversion": 0.18459407468918515,
+        "information_set": "logged"
+      },
+      "production": {
+        "ctr": 0.16377641832358744,
+        "revenue_per_search": 1175.795622574908,
+        "ndcg_at_10": 0.9480498486821912,
+        "conversion": 0.2076322025453739,
+        "information_set": "logged"
+      },
+      "price_asc": {
+        "ctr": 0.17262671178625805,
+        "revenue_per_search": 843.912315804453,
+        "ndcg_at_10": 0.9850353987472102,
+        "conversion": 0.21045248185925947,
+        "information_set": "logged"
+      }
+    },
+    "headline": {
+      "revenue_per_search_delta_abs": 284.7358926679883,
+      "revenue_per_search_delta_rel": 0.34448299336040883,
+      "ctr_delta_abs": -0.02905964775212,
+      "ctr_delta_rel": -0.16836353900843223,
+      "breakeven_rub_per_forgone_click": -981.8289530100332,
+      "clicks_per_search_delta_abs": -0.29000559801690695,
+      "information_set": "logged"
+    },
+    "ceiling_oracle": {
+      "revenue_per_search": 1196.5930037072626,
+      "label": "modeled",
+      "note": "affinity/price_index anti-correlation is a modelling assumption (src/serp_sim.py:57-61); the oracle-pair gap is the constructed ceiling, not a shippable result"
+    },
+    "failed_hypothesis": {
+      "learned_ranker": 826.5600861465134,
+      "price_asc": 843.912315804453,
+      "statement": "learned ranker loses to price sorting"
+    }
+  },
+  "realistic_policies": [
+    {
+      "policy": "production",
+      "ndcg_at_k": 0.9480498486821912,
+      "revenue_per_search": 1175.795622574908,
+      "ndcg_below_oracle": true
+    },
+    {
+      "policy": "price_asc",
+      "ndcg_at_k": 0.9850353987472102,
+      "revenue_per_search": 843.912315804453,
+      "ndcg_below_oracle": true
+    },
+    {
+      "policy": "click_trained",
+      "ndcg_at_k": 0.9822912048301428,
+      "revenue_per_search": 692.9775560047289,
+      "ndcg_below_oracle": true
+    },
+    {
+      "policy": "propensity_logistic",
+      "ndcg_at_k": 0.985043389069013,
+      "revenue_per_search": 826.5600861465134,
+      "ndcg_below_oracle": true
+    }
+  ],
+  "sensitivity": {
+    "k": 10,
+    "n_searches": 2000,
+    "eta": [
+      {
+        "eta": 0.6,
+        "ndcg_delta": 0.06879324875554743,
+        "revenue_delta": -309.67168643007545,
+        "divergence_holds": true
+      },
+      {
+        "eta": 0.8,
+        "ndcg_delta": 0.06879324875554743,
+        "revenue_delta": -327.4674123420294,
+        "divergence_holds": true
+      },
+      {
+        "eta": 1.0,
+        "ndcg_delta": 0.06879324875554743,
+        "revenue_delta": -330.14658097602404,
+        "divergence_holds": true
+      },
+      {
+        "eta": 1.2,
+        "ndcg_delta": 0.06879324875554743,
+        "revenue_delta": -324.85127328530035,
+        "divergence_holds": true
+      },
+      {
+        "eta": 1.4,
+        "ndcg_delta": 0.06879324875554743,
+        "revenue_delta": -315.7590925509094,
+        "divergence_holds": true
+      },
+      {
+        "eta": 1.6,
+        "ndcg_delta": 0.06879324875554743,
+        "revenue_delta": -305.25912031307723,
+        "divergence_holds": true
+      }
+    ],
+    "money_tilt": [
+      {
+        "money_tilt": 0.0,
+        "logged_ndcg_at_k": 1.0,
+        "logged_revenue_per_search": 901.1682374807228
+      },
+      {
+        "money_tilt": 0.25,
+        "logged_ndcg_at_k": 0.9778356752874714,
+        "logged_revenue_per_search": 1116.4816423286256
+      },
+      {
+        "money_tilt": 0.5,
+        "logged_ndcg_at_k": 0.9469211427023118,
+        "logged_revenue_per_search": 1192.2341513904157
+      },
+      {
+        "money_tilt": 0.75,
+        "logged_ndcg_at_k": 0.9286093266930725,
+        "logged_revenue_per_search": 1178.537740231397
+      },
+      {
+        "money_tilt": 1.0,
+        "logged_ndcg_at_k": 0.9129074049610155,
+        "logged_revenue_per_search": 1196.4021420698812
+      }
+    ],
+    "verdict": "does not vanish on eta in [0.6, 1.6]: NDCG rises while revenue falls at every grid point"
+  },
+  "ctr": {
+    "naive": 0.16304022108277286,
+    "true_position_free": 0.6286856062113474,
+    "ipw_known_curve": 0.6253447193897511,
+    "ipw_em_estimated": 0.6288083341223802,
+    "eta_mobile": 1.3,
+    "eta_desktop": 1.0
+  },
+  "propensity_estimated": {
+    "1": 1.0,
+    "2": 0.43972101864966845,
+    "3": 0.26579145521270053,
+    "4": 0.19814203942026717,
+    "5": 0.15849839792469772,
+    "6": 0.12599623281272226,
+    "7": 0.10087144168802176,
+    "8": 0.08942512659730202,
+    "9": 0.07294671811220657,
+    "10": 0.06978656522657248,
+    "11": 0.06322831435491685,
+    "12": 0.05066875607195564,
+    "13": 0.05982200428990741,
+    "14": 0.04155751151114474,
+    "15": 0.04838920177613851
+  },
+  "interleaving_example": {
+    "users": 4000,
+    "wins": {
+      "A": 1491,
+      "B": 1098,
+      "tie": 1411
+    },
+    "win_rate_a": 0.37275,
+    "win_rate_b": 0.2745,
+    "decision": "A"
+  }
+}

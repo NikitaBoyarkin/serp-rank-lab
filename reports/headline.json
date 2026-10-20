@@ -1,0 +1,56 @@
+{
+  "generated_from": {
+    "searches": 12000,
+    "seed": 42,
+    "commit": "31a5e0f24d27"
+  },
+  "policies": {
+    "ctr_objective": {
+      "ctr": 0.1726005994128253,
+      "revenue_per_search": 826.5600861465134,
+      "ndcg_at_10": 0.985043389069013,
+      "conversion": 0.21017282924980965,
+      "information_set": "logged"
+    },
+    "revenue_objective": {
+      "ctr": 0.1435409516607053,
+      "revenue_per_search": 1111.2959788145017,
+      "ndcg_at_10": 0.8826869608081014,
+      "conversion": 0.18459407468918515,
+      "information_set": "logged"
+    },
+    "production": {
+      "ctr": 0.16377641832358744,
+      "revenue_per_search": 1175.795622574908,
+      "ndcg_at_10": 0.9480498486821912,
+      "conversion": 0.2076322025453739,
+      "information_set": "logged"
+    },
+    "price_asc": {
+      "ctr": 0.17262671178625805,
+      "revenue_per_search": 843.912315804453,
+      "ndcg_at_10": 0.9850353987472102,
+      "conversion": 0.21045248185925947,
+      "information_set": "logged"
+    }
+  },
+  "headline": {
+    "revenue_per_search_delta_abs": 284.7358926679883,
+    "revenue_per_search_delta_rel": 0.34448299336040883,
+    "ctr_delta_abs": -0.02905964775212,
+    "ctr_delta_rel": -0.16836353900843223,
+    "breakeven_rub_per_forgone_click": -981.8289530100332,
+    "clicks_per_search_delta_abs": -0.29000559801690695,
+    "information_set": "logged"
+  },
+  "ceiling_oracle": {
+    "revenue_per_search": 1196.5930037072626,
+    "label": "modeled",
+    "note": "affinity/price_index anti-correlation is a modelling assumption (src/serp_sim.py:57-61); the oracle-pair gap is the constructed ceiling, not a shippable result"
+  },
+  "failed_hypothesis": {
+    "learned_ranker": 826.5600861465134,
+    "price_asc": 843.912315804453,
+    "statement": "learned ranker loses to price sorting"
+  }
+}

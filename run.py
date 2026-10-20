@@ -1,10 +1,15 @@
 """One entry point for the SERP Rank Lab pipeline (Phase 3).
 
-    python run.py --stage {ingest,sessions,serp,rank,eval,experiment,all}
+    python run.py --stage {raw,ingest,sessions,serp,rank,eval,experiment,all}
 
 Stage -> module
 ---------------
-``ingest``      ``src.data_ingest``   -- real feeds -> ``data/processed/*.parquet``
+``raw``         ``src.synthetic_raw`` -- schema-compatible synthetic feeds ->
+                                        ``data/raw/``; skipped when all three
+                                        feeds are already present (or when
+                                        ``AVIASALES_SOURCE_DIR`` points at the
+                                        real ones)
+``ingest``      ``src.data_ingest``   -- raw feeds -> ``data/processed/*.parquet``
 ``sessions``    ``src.sessions``      -- events -> ``data/processed/sessions.parquet``
 ``serp``        ``src.serp_sim``      -- ``serp_offers.parquet``
 ``rank``        ``src.ranking_eval``  -- ``reports/ranking_eval.json``
@@ -18,9 +23,11 @@ Stage -> module
 
 ``src/sessions.py`` exposes ``build_sessions`` but no ``main()``; the ``sessions``
 stage wires it here (events -> ``sessions.parquet``) rather than editing the
-verified module. ``--stage all`` runs end-to-end from a clone whose only data is
-``data/raw/`` (the raw real feeds themselves live outside the repo and are read in
-place by ``src/data_ingest``).
+verified module. ``--stage all`` runs end-to-end on a clean clone: the ``raw``
+stage materialises the synthetic feeds when ``data/raw/`` is empty, so nothing
+outside the repository is required. Real feeds still win -- point
+``AVIASALES_SOURCE_DIR`` at them (or drop them into ``data/raw/``) and the
+``raw`` stage skips generation.
 """
 
 from __future__ import annotations
@@ -32,6 +39,7 @@ import pandas as pd
 
 # Stage -> importable module exposing ``main()``. ``eval`` reuses ``rank``'s module.
 _STAGE_MODULE = {
+    "raw": "src.synthetic_raw",
     "ingest": "src.data_ingest",
     "serp": "src.serp_sim",
     "rank": "src.ranking_eval",
@@ -42,7 +50,7 @@ _STAGE_MODULE = {
 }
 
 # Dependency order for ``all`` (``eval`` is an alias, so it is not repeated).
-_ALL_ORDER = ["ingest", "sessions", "serp", "sql", "rank", "experiment", "business"]
+_ALL_ORDER = ["raw", "ingest", "sessions", "serp", "sql", "rank", "experiment", "business"]
 
 
 def _run_sessions() -> int:

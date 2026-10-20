@@ -5,11 +5,14 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 
-# Raw third-party data is never committed; only the loader is.
+# Raw data is never committed (synthetic or real); the loaders and the
+# generator are. `run.py --stage all` regenerates data/raw/ from a seed, so a
+# clean clone needs nothing from outside the repository.
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*.parquet
 
+# Report figures are build artifacts. Report JSON is NOT ignored: the portfolio
+# claims read reports/*.json, so they must be committed and reviewable.
 reports/*.png
-reports/*.json
 !reports/peeking.png

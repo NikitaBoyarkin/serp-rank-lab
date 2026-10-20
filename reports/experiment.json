@@ -1,0 +1,456 @@
+{
+  "seeds": {
+    "split": 20261011,
+    "outcome": 20261020,
+    "model": 0,
+    "aa": 101,
+    "cuped": 555,
+    "peek": 909
+  },
+  "design": {
+    "test_share": 0.1,
+    "rel_mde_for_sizing": 0.05,
+    "alpha": 0.05,
+    "power": 0.8,
+    "randomisation_unit": "user_id",
+    "control_policy": "production",
+    "test_policy": "revenue_objective",
+    "guardrail_max_rel_change": 0.1,
+    "held_out_searches": true
+  },
+  "inputs": {
+    "offers": 120136,
+    "searches": 12000,
+    "users": 4570,
+    "searches_experiment": 6000,
+    "users_experiment": 3491,
+    "searches_requested": 12000
+  },
+  "arms": {
+    "control": {
+      "policy": "production",
+      "n_users": 3151,
+      "n_searches": 5416,
+      "n_offers": 54046,
+      "revenue_per_search": 1221.276141113061
+    },
+    "test": {
+      "policy": "revenue_objective",
+      "n_users": 340,
+      "n_searches": 584,
+      "n_offers": 5832,
+      "revenue_per_search": 1047.0804688179942
+    },
+    "randomisation_unit": "user_id",
+    "disjoint_by_user": true,
+    "shared_outcome_seed": 20261020,
+    "treatment_check": {
+      "share_of_searches_reranked": 0.9691780821917808,
+      "share_of_offers_moved": 0.7760279234443368,
+      "mean_abs_position_change": 2.5620762216506896,
+      "n_offers_matched": 59878,
+      "n_offers_expected": 59878,
+      "note": "arm B must re-order a material share of SERPs, otherwise there is no treatment"
+    }
+  },
+  "srm": {
+    "unit": "user_id",
+    "planned_test_share": 0.1,
+    "n_control": 3151,
+    "n_test": 340,
+    "observed_test_share": 0.097393297049556,
+    "vs_planned": {
+      "chi2": 0.26356663165600497,
+      "p_value": 0.6076803513801998,
+      "observed_share": 0.097393297049556,
+      "mismatch": false
+    },
+    "vs_fifty_fifty": {
+      "chi2": 2263.454883987396,
+      "p_value": 0.0,
+      "observed_share": 0.097393297049556,
+      "mismatch": true
+    }
+  },
+  "aa_test": {
+    "n_a": 1596,
+    "n_b": 1555,
+    "ratio_a": 1265.4764306340578,
+    "ratio_b": 1174.4194629483527,
+    "diff": -91.0569676857051,
+    "p_value": 0.19495284158825843,
+    "non_significant": true
+  },
+  "primary": {
+    "metric": "revenue per search",
+    "definition": "sum(commission) / sum(searches), users summed before the test",
+    "control": {
+      "policy": "production",
+      "revenue_per_search": 1221.2761411130612,
+      "n_users": 3151,
+      "n_searches": 5416
+    },
+    "test": {
+      "policy": "revenue_objective",
+      "revenue_per_search": 1047.0804688179942,
+      "n_users": 340,
+      "n_searches": 584
+    },
+    "diff_abs": -174.19567229506697,
+    "diff_rel": -0.14263414016776454,
+    "se": 110.13826839675784,
+    "z": -1.5816089614515385,
+    "p_value": 0.11373886696994957,
+    "ci_low_abs": -390.06271167231836,
+    "ci_high_abs": 41.67136708218442,
+    "ci_low_rel": -0.31938944726850915,
+    "ci_high_rel": 0.034121166932980014,
+    "alpha": 0.05,
+    "significant": false,
+    "cluster": "user_id",
+    "naive_per_unit": {
+      "diff": -148.9105429138142,
+      "se": 122.04027772303,
+      "p_value": 0.22307413484878846,
+      "significant": false
+    },
+    "se_ratio_naive_over_delta": 1.108064249597577
+  },
+  "guardrails": {
+    "ctr": {
+      "label": "CTR (clicks per offer impression)",
+      "numerator": "clicks",
+      "denominator": "offers",
+      "control": 0.16467453650593936,
+      "test": 0.14317558299039781,
+      "diff_abs": -0.02149895351554154,
+      "diff_rel": -0.13055420693269196,
+      "se": 0.00478497828926639,
+      "z": -4.493009626348306,
+      "p_value": 7.022360905057436e-06,
+      "ci_low_abs": -0.030877338629309747,
+      "ci_high_abs": -0.012120568401773337,
+      "ci_low_rel": -0.18750524084940168,
+      "ci_high_rel": -0.07360317301598224,
+      "n_control_users": 3151,
+      "n_test_users": 340,
+      "cluster": "user_id",
+      "harmful_direction": "down",
+      "threshold_rel": 0.1,
+      "bad_side_ci_rel": -0.07360317301598224,
+      "significant": true,
+      "point_flag": true,
+      "ci_beyond_threshold": false,
+      "breach": true,
+      "rule": "breach when the effect is worse than 10% in the harmful direction and significant at 5%; the CI bound is reported separately"
+    },
+    "booking_conversion": {
+      "label": "Booking conversion (share of searches with >=1 booking)",
+      "numerator": "booked_searches",
+      "denominator": "searches",
+      "control": 0.29985228951255544,
+      "test": 0.2517123287671233,
+      "diff_abs": -0.04813996074543214,
+      "diff_rel": -0.1605455833726973,
+      "se": 0.018363183330377113,
+      "z": -2.6215476848067563,
+      "p_value": 0.008753151615359544,
+      "ci_low_abs": -0.08413113871447757,
+      "ci_high_abs": -0.012148782776386716,
+      "ci_low_rel": -0.2805752754172478,
+      "ci_high_rel": -0.04051589132814682,
+      "n_control_users": 3151,
+      "n_test_users": 340,
+      "cluster": "user_id",
+      "harmful_direction": "down",
+      "threshold_rel": 0.1,
+      "bad_side_ci_rel": -0.04051589132814682,
+      "significant": true,
+      "point_flag": true,
+      "ci_beyond_threshold": false,
+      "breach": true,
+      "rule": "breach when the effect is worse than 10% in the harmful direction and significant at 5%; the CI bound is reported separately"
+    },
+    "mean_price_top5": {
+      "label": "Mean price in the top 5 slots",
+      "numerator": "top5_price_sum",
+      "denominator": "searches",
+      "control": 54511.878708280434,
+      "test": 54288.29630564179,
+      "diff_abs": -223.58240263864718,
+      "diff_rel": -0.004101535443956084,
+      "se": 1088.9838873754306,
+      "z": -0.2053128657187987,
+      "p_value": 0.8373276927816693,
+      "ci_low_abs": -2357.951601638914,
+      "ci_high_abs": 1910.7867963616195,
+      "ci_low_rel": -0.04325573907033106,
+      "ci_high_rel": 0.035052668182418895,
+      "n_control_users": 3151,
+      "n_test_users": 340,
+      "cluster": "user_id",
+      "harmful_direction": "up",
+      "threshold_rel": 0.1,
+      "bad_side_ci_rel": -0.04325573907033106,
+      "significant": false,
+      "point_flag": false,
+      "ci_beyond_threshold": false,
+      "breach": false,
+      "rule": "breach when the effect is worse than 10% in the harmful direction and significant at 5%; the CI bound is reported separately"
+    },
+    "share_above_route_median": {
+      "label": "Share of offers priced above their SERP median",
+      "numerator": "offers_above_median",
+      "denominator": "offers",
+      "control": 0.47305998593790466,
+      "test": 0.4722222222222222,
+      "diff_abs": -0.0008377637156824491,
+      "diff_rel": -0.001770946054592782,
+      "se": 0.0011074718568691282,
+      "z": -0.7564650157800344,
+      "p_value": 0.44937043989061143,
+      "ci_low_abs": -0.003008368669037638,
+      "ci_high_abs": 0.00133284123767274,
+      "ci_low_rel": -0.006359380963226355,
+      "ci_high_rel": 0.0028174888540407916,
+      "n_control_users": 3151,
+      "n_test_users": 340,
+      "cluster": "user_id",
+      "harmful_direction": "down",
+      "threshold_rel": 0.1,
+      "bad_side_ci_rel": 0.0028174888540407916,
+      "significant": false,
+      "point_flag": false,
+      "ci_beyond_threshold": false,
+      "breach": false,
+      "rule": "breach when the effect is worse than 10% in the harmful direction and significant at 5%; the CI bound is reported separately"
+    }
+  },
+  "decision": {
+    "verdict": "do_not_ship",
+    "reason": "guardrail breach: ctr, booking_conversion",
+    "stopping_rule": "do not ship if a guardrail is worse than 10% relative in its harmful direction and the difference is significant at 5%",
+    "guardrails_breached": [
+      "ctr",
+      "booking_conversion"
+    ],
+    "primary_significant": false,
+    "primary_diff_rel": -0.14263414016776454,
+    "changes_our_mind": "a guardrail breach on the same readout, or a CI that excludes zero"
+  },
+  "heterogeneity": {
+    "metric": "ctr",
+    "by_device": [
+      {
+        "device": "mobile",
+        "metric": "ctr",
+        "n_control_users": 2368,
+        "n_test_users": 252,
+        "n_control_searches": 3400,
+        "n_test_searches": 371,
+        "control": 0.14932180299709766,
+        "test": 0.13452671548684567,
+        "diff_abs": -0.014795087510251992,
+        "diff_rel": -0.09908189703910528,
+        "se": 0.005919516333683041,
+        "z": -2.499374387408218,
+        "p_value": 0.012441279661120339,
+        "ci_low_abs": -0.026397126330167338,
+        "ci_high_abs": -0.0031930486903366476,
+        "ci_low_rel": -0.17678012052051376,
+        "ci_high_rel": -0.021383673557696797,
+        "cluster": "user_id",
+        "mde_rel": 0.06241132589040237,
+        "p_value_bh": 0.012441279661120339,
+        "significant_bh": true
+      },
+      {
+        "device": "desktop",
+        "metric": "ctr",
+        "n_control_users": 1620,
+        "n_test_users": 178,
+        "n_control_searches": 2016,
+        "n_test_searches": 213,
+        "control": 0.1902366863905325,
+        "test": 0.15804195804195803,
+        "diff_abs": -0.03219472834857448,
+        "diff_rel": -0.16923511946840086,
+        "se": 0.008681655182001287,
+        "z": -3.7083629415874797,
+        "p_value": 0.0002086035195324439,
+        "ci_low_abs": -0.04921045983149253,
+        "ci_high_abs": -0.015178996865656429,
+        "ci_low_rel": -0.2586801776523247,
+        "ci_high_rel": -0.07979006128447705,
+        "cluster": "user_id",
+        "mde_rel": 0.07338453444607074,
+        "p_value_bh": 0.0004172070390648878,
+        "significant_bh": true
+      }
+    ],
+    "comparisons": 2,
+    "correction": "benjamini-hochberg",
+    "underpowered_on_revenue": true,
+    "revenue_note": "revenue per search is not tested by device: at segment level the experiment has no power for it (see mde_rel on CTR times the revenue/CTR variance ratio); reporting the point estimate would invite a decision the data cannot support"
+  },
+  "power": {
+    "baseline_rps": 1204.3210956763412,
+    "variance_per_user": 3907794.568962331,
+    "searches_per_user": 1.7187052420509883,
+    "searches_per_user_full_dataset": 2.62582056892779,
+    "observed_effect_rel": -0.14263414016776443,
+    "run": {
+      "searches": 6000,
+      "users": 3491,
+      "mde_rel": 0.15566195380567946,
+      "is_scenario": false,
+      "label": "this readout: held-out searches actually simulated"
+    },
+    "at_real_traffic": {
+      "searches": 12000,
+      "users": 4570,
+      "mde_rel": 0.1360502366705234,
+      "mde_abs": 163.84817009407027,
+      "is_scenario": false,
+      "label": "real traffic; the MDE a 5% effect would need to clear here"
+    },
+    "at_scenario_60000": {
+      "searches": 60000,
+      "users": 22850,
+      "mde_rel": 0.060843515510044986,
+      "mde_abs": 73.27512926385783,
+      "is_scenario": true,
+      "label": "SCENARIO: requires re-simulating with more searches, not extra data"
+    },
+    "required_n_per_arm": {
+      "observed_effect_rel": -0.14263414016776443,
+      "n_per_arm_users": 2078.9202556878463,
+      "n_total_users": 4157.840511375693,
+      "n_per_arm_searches": 5458.871568545766,
+      "allocation": "50/50 (even split, the cheapest way to size an arm)",
+      "alpha": 0.05,
+      "power": 0.8,
+      "label": "users per arm to detect the observed effect with 80% power"
+    },
+    "required_n_at_planned_split": {
+      "test_share": 0.1,
+      "n_control_users": 10394.601278439231,
+      "n_test_users": 1154.955697604359,
+      "n_total_users": 11549.55697604359,
+      "label": "same effect at the live 90/10 allocation, with its cost multiple"
+    },
+    "detectable_at_run": false,
+    "detectable_at_real_traffic": true,
+    "labels": {
+      "reality": "at_real_traffic / run",
+      "scenario": "at_scenario_60000 is constructed from the measured variance"
+    }
+  },
+  "cuped": {
+    "pre_month_max": 4,
+    "real": {
+      "theta": -0.0065879534971024995,
+      "corr_x_y": -0.006473322140573125,
+      "corr_squared_theory": 4.190389953563423e-05,
+      "var_raw": 4934440.657014348,
+      "var_adjusted": 4934233.884708792,
+      "variance_reduction_pct": 0.0041903899535511435,
+      "ci_half_width_raw": 363.4761182781865,
+      "ci_half_width_adjusted": 363.46987351903135,
+      "ci_narrowing_pct": 0.0017180658758886302,
+      "n_users": 2294,
+      "covariate": "pre-period revenue per search",
+      "verdict": "the covariate has nothing to explain (i.i.d. users)"
+    },
+    "positive_control": {
+      "theta": 0.3415957272526248,
+      "corr_x_y": 0.33529512920725046,
+      "corr_squared_theory": 0.11242282367010678,
+      "var_raw": 1.02504186074735,
+      "var_adjusted": 0.9098037603820723,
+      "variance_reduction_pct": 11.242282367010692,
+      "ci_half_width_raw": 0.16564855078202456,
+      "ci_half_width_adjusted": 0.15601131441860866,
+      "ci_narrowing_pct": 5.8178814833686365,
+      "n_users": 2294,
+      "covariate": "synthetic latent (rho = 0.6)",
+      "verdict": "machinery alive: a constructed signal is recovered"
+    },
+    "interpretation": {
+      "real": "an honest null: no pre-period signal exists to remove",
+      "control": "proves the estimator works when a signal is present",
+      "simulator_untouched": true,
+      "note": "correlation is deliberately NOT wired into the simulator"
+    }
+  },
+  "peeking": {
+    "n_sims": 400,
+    "n_batches_requested": 10,
+    "n_batches": 6,
+    "batch_size": 250,
+    "arm_users": 1500,
+    "looks_limited": true,
+    "duplicated_interims": 0,
+    "alpha": 0.05,
+    "tau": 61.06380705565306,
+    "naive_peeking_fpr": 0.15,
+    "msprt_always_valid_fpr": 0.0,
+    "inflation_factor": null
+  },
+  "sample_size": {
+    "baseline_rps": 1221.276141113061,
+    "rel_mde": 0.05,
+    "alpha": 0.05,
+    "power": 0.8,
+    "variance_per_user": 3907794.568962331,
+    "planned_test_share": 0.1,
+    "planned": {
+      "n_total": 91396.40971572844,
+      "n_control": 82256.7687441556,
+      "n_test": 9139.640971572844,
+      "delta_abs": 61.06380705565305
+    },
+    "even": {
+      "n_total": 32902.70749766224,
+      "n_control": 16451.35374883112,
+      "n_test": 16451.35374883112,
+      "delta_abs": 61.06380705565305
+    },
+    "cost_multiple": 2.7777777777777777,
+    "power_at_planned_n": 0.8
+  },
+  "ratio_metric": {
+    "control_rps": 1221.2761411130612,
+    "test_rps": 1047.0804688179942,
+    "relative_lift": -0.14263414016776454,
+    "delta_method": {
+      "diff": -174.19567229506697,
+      "se": 110.13826839675784,
+      "z": -1.5816089614515385,
+      "p_value": 0.11373886696994957,
+      "ci_low": -390.06271167231836,
+      "ci_high": 41.67136708218442,
+      "significant": false
+    },
+    "naive_per_unit": {
+      "diff": -148.9105429138142,
+      "se": 122.04027772303,
+      "p_value": 0.22307413484878846,
+      "significant": false
+    },
+    "se_ratio_naive_over_delta": 1.108064249597577,
+    "p_values_differ": true
+  },
+  "phase2_divergence": {
+    "ndcg_k": 10,
+    "ndcg_relevance": 1.0,
+    "ndcg_revenue": 0.9315723731890515,
+    "revenue_per_search_relevance": 868.8691221268126,
+    "revenue_per_search_revenue": 1196.5930037072626,
+    "ndcg_delta": 0.06842762681094852,
+    "revenue_delta": -327.7238815804499,
+    "ndcg_rises_while_revenue_falls": true,
+    "label": "modeled",
+    "note": "both reference policies read the simulator's ground truth; this gap is the constructed ceiling (src/serp_sim.py:57-61), not a shippable result"
+  }
+}

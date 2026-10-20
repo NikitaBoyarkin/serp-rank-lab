@@ -21,8 +21,8 @@ _ARTIFACT = Path(__file__).resolve().parents[1] / "data" / "processed" / "bookin
 pytestmark = pytest.mark.skipif(
     not _ARTIFACT.exists(),
     reason=(
-        "needs data/processed/bookings_legs.parquet, which is built from the gitignored "
-        "raw Aviasales feeds and therefore unavailable in CI"
+        "needs data/processed/bookings_legs.parquet; run `python run.py --stage all`, "
+        "which regenerates it (and the raw feeds behind it) from a seed"
     ),
 )
 
@@ -31,13 +31,18 @@ SMALL = SimConfig(n_searches=300)
 # Captured on the default config *before* ``simulate_serps`` gained its optional
 # ``partners`` argument. These numbers must not move: if they do, the default path
 # stopped being the default path and every Phase 2/3 result silently shifts.
+#
+# The digest pins the SYNTHETIC fixture, not third-party data: the inputs are
+# ``data/raw/*`` produced deterministically by ``src.synthetic_raw`` (seed 42)
+# and then loaded by ``src.data_ingest``. The real Aviasales feeds are not in the
+# repository, so without that generator this snapshot could not exist at all.
 GOLDEN = {
     "rows": 2847,
     "cols": 19,
-    "revenue": 324092.788229,
+    "revenue": 324092.7692354174,
     "clicks": 450,
     "bookings": 93,
-    "sha256": "89a57d39069ec474d7acef46fb04a8a09b21b8f6209aa12873baf88f818e111f",
+    "sha256": "594f452b0e49e114d582ff5518db7375f27365b47bc25661fcaa99c1d5dccb21",
 }
 
 

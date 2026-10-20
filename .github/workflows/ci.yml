@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,12 +20,38 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-groups
 
-      - name: Lint
-        run: |
-          uv run ruff check .
-          uv run ruff format --check .
+      - name: Ruff lint
+        run: uv run ruff check .
 
-      # Tests that need data/processed/bookings_legs.parquet skip themselves in CI:
-      # that artifact is built from the gitignored raw Aviasales feeds.
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+  clean-clone:
+    # The same contract a reviewer runs locally: no data outside the repo.
+    # `data/processed/` and `data/raw/` are both gitignored, so this checkout
+    # starts empty and `--stage all` has to build everything from the seed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Assert the checkout has no prebuilt artifacts
+        run: |
+          test ! -e data/processed/bookings_legs.parquet
+          test ! -e data/processed/serp_offers.parquet
+          test ! -e "data/raw/Aviastats Аналитик/data.csv"
+
+      - name: Run the pipeline from a clean state
+        run: uv run python run.py --stage all
+
       - name: Run tests
         run: uv run pytest -q

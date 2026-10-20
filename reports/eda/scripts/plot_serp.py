@@ -115,7 +115,7 @@ def main() -> None:
         xy=(1, 47.3),
         xytext=(3.2, 55),
         color="#d62728",
-        arrowprops=dict(arrowstyle="->", color="#d62728"),
+        arrowprops={"arrowstyle": "->", "color": "#d62728"},
     )
     ax2.legend(loc="lower right", frameon=False)
     save(fig, "fig2_commission_by_position.png")
@@ -160,7 +160,7 @@ def main() -> None:
         "CPC mean = 2.35\nvs CPA mean = 194.3\n(mixed economics)",
         ha="center",
         fontsize=9,
-        bbox=dict(boxstyle="round", fc="white", ec="gray"),
+        bbox={"boxstyle": "round", "fc": "white", "ec": "gray"},
     )
     fig.suptitle(
         "Commission concentration — by partner and by partner type",
@@ -214,7 +214,7 @@ def main() -> None:
         xytext=(6.5, 0.35),
         color="gray",
         fontsize=9,
-        arrowprops=dict(arrowstyle="->", color="gray"),
+        arrowprops={"arrowstyle": "->", "color": "gray"},
     )
     ax.set(
         xlabel="SERP position",
@@ -277,7 +277,7 @@ def main() -> None:
         ha="right",
         va="top",
         fontsize=9,
-        bbox=dict(boxstyle="round", fc="white", ec="gray"),
+        bbox={"boxstyle": "round", "fc": "white", "ec": "gray"},
     )
     fig.suptitle("Trend & anomalies — measured vs modeled tracks", fontsize=14, fontweight="bold")
     save(fig, "fig5_trend.png")
