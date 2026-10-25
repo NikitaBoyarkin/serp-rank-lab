@@ -615,9 +615,10 @@ def page_experiment() -> None:
                         "control": g["control"],
                         "test": g["test"],
                         "delta_%": g["diff_rel"] * 100,
-                        "p_value": g["p_value"],
+                        "p_raw": g["p_value"],
+                        "p_holm": g.get("p_value_holm"),
                         "harmful_direction": g["harmful_direction"],
-                        "breach": g["breach"],
+                        "breach": g.get("breach_holm", g["breach"]),
                     }
                     for g in guardrails.values()
                 ]
@@ -626,8 +627,14 @@ def page_experiment() -> None:
             hide_index=True,
             column_config={
                 "delta_%": st.column_config.NumberColumn(format="%.2f"),
-                "p_value": st.column_config.NumberColumn(format="%.3g"),
+                "p_raw": st.column_config.NumberColumn(format="%.3g"),
+                "p_holm": st.column_config.NumberColumn(format="%.3g"),
             },
+        )
+        family = report.get("multiplicity", {})
+        st.caption(
+            f"Breach decisions use Holm over the family of {family.get('m', 5)} tests "
+            "(primary + guardrails); raw p is shown alongside."
         )
         st.caption(decision["changes_our_mind"])
 

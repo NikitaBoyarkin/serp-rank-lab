@@ -507,37 +507,96 @@ def guardrails_readout(control: pd.DataFrame, test: pd.DataFrame) -> dict:
 # --------------------------------------------------------------------------- #
 
 
+def multiplicity_readout(primary: dict, guardrails: dict) -> dict:
+    """Holm + BH correction over primary + 4 guardrails; annotates both dicts in place."""
+    names = ["primary", *guardrails]
+    raw = [primary["p_value"], *(g["p_value"] for g in guardrails.values())]
+    holm = _holm_adjust(raw)
+    bh = _bh_adjust(raw)
+
+    metrics: dict[str, dict] = {}
+    for i, name in enumerate(names):
+        significant_raw = bool(raw[i] < ALPHA)
+        significant_holm = bool(holm[i] < ALPHA)
+        metrics[name] = {
+            "p_raw": raw[i],
+            "p_holm": holm[i],
+            "p_bh": bh[i],
+            "significant_raw": significant_raw,
+            "significant_holm": significant_holm,
+            "significant_bh": bool(bh[i] < ALPHA),
+            "flips": significant_raw != significant_holm,
+        }
+
+    primary["p_value_holm"] = holm[0]
+    primary["p_value_bh"] = bh[0]
+    primary["significant_holm"] = metrics["primary"]["significant_holm"]
+    primary["significant_bh"] = metrics["primary"]["significant_bh"]
+    for i, name in enumerate(guardrails, start=1):
+        g = guardrails[name]
+        g["p_value_holm"] = holm[i]
+        g["p_value_bh"] = bh[i]
+        g["significant_holm"] = metrics[name]["significant_holm"]
+        g["significant_bh"] = metrics[name]["significant_bh"]
+        g["breach_holm"] = bool(g["point_flag"] and g["significant_holm"])
+        g["breach_bh"] = bool(g["point_flag"] and g["significant_bh"])
+
+    return {
+        "family": names,
+        "m": len(names),
+        "alpha": ALPHA,
+        "method_default": "holm",
+        "metrics": metrics,
+        "verdict_inputs_changed": [
+            name
+            for name in names
+            if metrics[name]["significant_raw"] != metrics[name]["significant_holm"]
+        ],
+    }
+
+
+def _verdict(
+    breached: list[str], primary_significant: bool, primary_diff_abs: float
+) -> tuple[str, str]:
+    """The stopping rule: guardrail breach, then the primary metric."""
+    if breached:
+        return "do_not_ship", "guardrail breach: " + ", ".join(breached)
+    if primary_significant and primary_diff_abs < 0:
+        return "do_not_ship", "primary metric significantly worse than production"
+    if primary_significant and primary_diff_abs > 0:
+        return "ship", "primary metric significantly better, no guardrail breach"
+    return "extend", "primary metric not significant at this sample size; see power"
+
+
 def decision_readout(primary: dict, guardrails: dict) -> dict:
     """Stopping rule first, verdict second.
 
     A guardrail breach blocks the rollout regardless of the revenue: that is the
     point of a guardrail. Otherwise the verdict follows the primary metric -- and
     an experiment with no significant effect is reported as underpowered, not as
-    "no difference".
+    "no difference". Significance means the Holm-adjusted p-value; the raw verdict
+    stays visible as ``verdict_raw``.
     """
-    breached = [name for name, g in guardrails.items() if g["breach"]]
-    if breached:
-        verdict = "do_not_ship"
-        reason = "guardrail breach: " + ", ".join(breached)
-    elif primary["significant"] and primary["diff_abs"] < 0:
-        verdict = "do_not_ship"
-        reason = "primary metric significantly worse than production"
-    elif primary["significant"] and primary["diff_abs"] > 0:
-        verdict = "ship"
-        reason = "primary metric significantly better, no guardrail breach"
-    else:
-        verdict = "extend"
-        reason = "primary metric not significant at this sample size; see power"
+    breached = [name for name, g in guardrails.items() if g.get("breach_holm", g["breach"])]
+    breached_raw = [name for name, g in guardrails.items() if g["breach"]]
+    primary_significant = bool(primary.get("significant_holm", primary["significant"]))
+    primary_significant_raw = bool(primary["significant"])
+    verdict, reason = _verdict(breached, primary_significant, primary["diff_abs"])
+    verdict_raw, _ = _verdict(breached_raw, primary_significant_raw, primary["diff_abs"])
     return {
         "verdict": verdict,
         "reason": reason,
+        "verdict_raw": verdict_raw,
         "stopping_rule": (
             f"do not ship if a guardrail is worse than "
             f"{GUARDRAIL_MAX_REL_CHANGE:.0%} relative in its harmful direction and "
             "the difference is significant at 5%"
         ),
+        "multiplicity": "holm over primary + 4 guardrails",
         "guardrails_breached": breached,
-        "primary_significant": bool(primary["significant"]),
+        "guardrails_breached_raw": breached_raw,
+        "primary_significant": primary_significant,
+        "primary_significant_raw": primary_significant_raw,
         "primary_diff_rel": primary["diff_rel"],
         "changes_our_mind": "a guardrail breach on the same readout, or a CI that excludes zero",
     }
@@ -558,6 +617,18 @@ def _bh_adjust(p_values: list[float]) -> list[float]:
         k = m - rank + 1  # 1-based rank from the largest p-value downwards
         running = min(running, p_values[i] * m / k)
         adjusted[i] = min(1.0, running)
+    return adjusted
+
+
+def _holm_adjust(p_values: list[float]) -> list[float]:
+    """Holm step-down adjusted p-values (monotone, capped at 1)."""
+    m = len(p_values)
+    order = sorted(range(m), key=lambda i: p_values[i])
+    adjusted = [1.0] * m
+    running = 0.0
+    for rank, i in enumerate(order, start=1):
+        running = max(running, min(1.0, (m - rank + 1) * p_values[i]))
+        adjusted[i] = running
     return adjusted
 
 
@@ -1119,6 +1190,17 @@ def main(argv: list[str] | None = None) -> int:
         )
     print()
 
+    multiplicity = multiplicity_readout(primary, guardrails)
+    print("--- 5b. Multiplicity (Holm + BH over primary + 4 guardrails) ---")
+    for name in multiplicity["family"]:
+        block = multiplicity["metrics"][name]
+        flip = "  FLIP" if block["flips"] else ""
+        print(
+            f"{name:<26} p_raw={block['p_raw']:.4f}  p_holm={block['p_holm']:.4f}  "
+            f"p_bh={block['p_bh']:.4f}{flip}"
+        )
+    print()
+
     decision = decision_readout(primary, guardrails)
     print("--- 6. Decision ---")
     print(f"verdict: {decision['verdict']}  ({decision['reason']})\n")
@@ -1242,6 +1324,7 @@ def main(argv: list[str] | None = None) -> int:
         "aa_test": aa,
         "primary": primary,
         "guardrails": guardrails,
+        "multiplicity": multiplicity,
         "decision": decision,
         "heterogeneity": hetero,
         "power": power,

@@ -114,7 +114,11 @@
       "p_value": 0.22307413484878846,
       "significant": false
     },
-    "se_ratio_naive_over_delta": 1.108064249597577
+    "se_ratio_naive_over_delta": 1.108064249597577,
+    "p_value_holm": 0.34121660090984873,
+    "p_value_bh": 0.18956477828324927,
+    "significant_holm": false,
+    "significant_bh": false
   },
   "guardrails": {
     "ctr": {
@@ -142,7 +146,13 @@
       "point_flag": true,
       "ci_beyond_threshold": false,
       "breach": true,
-      "rule": "breach when the effect is worse than 10% in the harmful direction and significant at 5%; the CI bound is reported separately"
+      "rule": "breach when the effect is worse than 10% in the harmful direction and significant at 5%; the CI bound is reported separately",
+      "p_value_holm": 3.511180452528718e-05,
+      "p_value_bh": 3.511180452528718e-05,
+      "significant_holm": true,
+      "significant_bh": true,
+      "breach_holm": true,
+      "breach_bh": true
     },
     "booking_conversion": {
       "label": "Booking conversion (share of searches with >=1 booking)",
@@ -169,7 +179,13 @@
       "point_flag": true,
       "ci_beyond_threshold": false,
       "breach": true,
-      "rule": "breach when the effect is worse than 10% in the harmful direction and significant at 5%; the CI bound is reported separately"
+      "rule": "breach when the effect is worse than 10% in the harmful direction and significant at 5%; the CI bound is reported separately",
+      "p_value_holm": 0.035012606461438174,
+      "p_value_bh": 0.021882879038398858,
+      "significant_holm": true,
+      "significant_bh": true,
+      "breach_holm": true,
+      "breach_bh": true
     },
     "mean_price_top5": {
       "label": "Mean price in the top 5 slots",
@@ -196,7 +212,13 @@
       "point_flag": false,
       "ci_beyond_threshold": false,
       "breach": false,
-      "rule": "breach when the effect is worse than 10% in the harmful direction and significant at 5%; the CI bound is reported separately"
+      "rule": "breach when the effect is worse than 10% in the harmful direction and significant at 5%; the CI bound is reported separately",
+      "p_value_holm": 0.8987408797812229,
+      "p_value_bh": 0.8373276927816693,
+      "significant_holm": false,
+      "significant_bh": false,
+      "breach_holm": false,
+      "breach_bh": false
     },
     "share_above_route_median": {
       "label": "Share of offers priced above their SERP median",
@@ -223,18 +245,91 @@
       "point_flag": false,
       "ci_beyond_threshold": false,
       "breach": false,
-      "rule": "breach when the effect is worse than 10% in the harmful direction and significant at 5%; the CI bound is reported separately"
+      "rule": "breach when the effect is worse than 10% in the harmful direction and significant at 5%; the CI bound is reported separately",
+      "p_value_holm": 0.8987408797812229,
+      "p_value_bh": 0.5617130498632643,
+      "significant_holm": false,
+      "significant_bh": false,
+      "breach_holm": false,
+      "breach_bh": false
     }
+  },
+  "multiplicity": {
+    "family": [
+      "primary",
+      "ctr",
+      "booking_conversion",
+      "mean_price_top5",
+      "share_above_route_median"
+    ],
+    "m": 5,
+    "alpha": 0.05,
+    "method_default": "holm",
+    "metrics": {
+      "primary": {
+        "p_raw": 0.11373886696994957,
+        "p_holm": 0.34121660090984873,
+        "p_bh": 0.18956477828324927,
+        "significant_raw": false,
+        "significant_holm": false,
+        "significant_bh": false,
+        "flips": false
+      },
+      "ctr": {
+        "p_raw": 7.022360905057436e-06,
+        "p_holm": 3.511180452528718e-05,
+        "p_bh": 3.511180452528718e-05,
+        "significant_raw": true,
+        "significant_holm": true,
+        "significant_bh": true,
+        "flips": false
+      },
+      "booking_conversion": {
+        "p_raw": 0.008753151615359544,
+        "p_holm": 0.035012606461438174,
+        "p_bh": 0.021882879038398858,
+        "significant_raw": true,
+        "significant_holm": true,
+        "significant_bh": true,
+        "flips": false
+      },
+      "mean_price_top5": {
+        "p_raw": 0.8373276927816693,
+        "p_holm": 0.8987408797812229,
+        "p_bh": 0.8373276927816693,
+        "significant_raw": false,
+        "significant_holm": false,
+        "significant_bh": false,
+        "flips": false
+      },
+      "share_above_route_median": {
+        "p_raw": 0.44937043989061143,
+        "p_holm": 0.8987408797812229,
+        "p_bh": 0.5617130498632643,
+        "significant_raw": false,
+        "significant_holm": false,
+        "significant_bh": false,
+        "flips": false
+      }
+    },
+    "verdict_inputs_changed": []
   },
   "decision": {
     "verdict": "do_not_ship",
     "reason": "guardrail breach: ctr, booking_conversion",
+    "verdict_raw": "do_not_ship",
     "stopping_rule": "do not ship if a guardrail is worse than 10% relative in its harmful direction and the difference is significant at 5%",
+    "multiplicity": "holm over primary + 4 guardrails",
     "guardrails_breached": [
       "ctr",
       "booking_conversion"
     ],
+    "guardrails_breached_raw": [
+      "ctr",
+      "booking_conversion"
+    ],
     "primary_significant": false,
+    "primary_significant_raw": false,
     "primary_diff_rel": -0.14263414016776454,
     "changes_our_mind": "a guardrail breach on the same readout, or a CI that excludes zero"
   },

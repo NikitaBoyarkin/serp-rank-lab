@@ -41,8 +41,9 @@ vocabulary; that file is the contract.
   CTR, booking conversion, mean price in the top 5, share of offers above their SERP
   median. Refund rate is **not** one: there is no join between `orders` and the ranking.
 - **stopping rule** — do not ship if a guardrail is worse than 10% relative in its
-  harmful direction **and** significant at 5%. The CI bound is reported separately from
-  the point estimate.
+  harmful direction **and** significant after Holm correction over the family of five
+  tests (primary + four guardrails); see `multiplicity` in `reports/experiment.json`.
+  The CI bound is reported separately from the point estimate.
 - **CUPED** — variance reduction using a pre-period covariate; here the pre-period
   revenue per search, with a constructed positive control. Because users are i.i.d., the
   real reduction is ~0 (`corr² = 0.004%`); see `docs/adr/0002`.

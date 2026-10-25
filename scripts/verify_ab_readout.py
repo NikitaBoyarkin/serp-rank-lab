@@ -86,6 +86,7 @@ def recompute() -> dict:
         + manual_delta_se(b["searches"].to_numpy(float), b["revenue"].to_numpy(float)) ** 2
     )
     guardrails = xp.guardrails_readout(control, test)
+    multiplicity = xp.multiplicity_readout(primary, guardrails)
 
     search_a, search_b = xp.search_table(control), xp.search_table(test)
     naive = {
@@ -108,10 +109,16 @@ def recompute() -> dict:
         "primary": primary,
         "manual_se": manual_se,
         "guardrails": guardrails,
+        "multiplicity": multiplicity,
         "decision": xp.decision_readout(primary, guardrails),
         "naive": naive,
-        "bh_p": dict(zip(list(guardrails), bh_adjust([g["p_value"] for g in guardrails.values()]),
-                         strict=True)),
+        "bh_p": dict(
+            zip(
+                list(guardrails),
+                bh_adjust([g["p_value"] for g in guardrails.values()]),
+                strict=True,
+            )
+        ),
     }
 
 
@@ -129,10 +136,14 @@ def comparisons(stored: dict, fresh: dict) -> list[tuple[str, float, float, str]
     compare("srm.n_control", stored["srm"]["n_control"], fresh["srm"]["n_control"])
     compare("srm.n_test", stored["srm"]["n_test"], fresh["srm"]["n_test"])
     compare(
-        "srm.chi2_vs_planned", stored["srm"]["vs_planned"]["chi2"], fresh["srm"]["vs_planned"]["chi2"]
+        "srm.chi2_vs_planned",
+        stored["srm"]["vs_planned"]["chi2"],
+        fresh["srm"]["vs_planned"]["chi2"],
     )
     compare(
-        "srm.p_vs_planned", stored["srm"]["vs_planned"]["p_value"], fresh["srm"]["vs_planned"]["p_value"]
+        "srm.p_vs_planned",
+        stored["srm"]["vs_planned"]["p_value"],
+        fresh["srm"]["vs_planned"]["p_value"],
     )
 
     old_primary, new_primary = stored["primary"], fresh["primary"]
@@ -154,6 +165,17 @@ def comparisons(stored: dict, fresh: dict) -> list[tuple[str, float, float, str]
         old_g = stored["guardrails"][name]
         for key in ("control", "test", "diff_rel", "p_value"):
             compare(f"guardrail.{name}.{key}", old_g[key], new_g[key])
+
+    old_mult = stored.get("multiplicity")
+    if old_mult is not None:
+        new_mult = fresh["multiplicity"]
+        for name in new_mult["family"]:
+            for key in ("p_raw", "p_holm", "p_bh"):
+                compare(
+                    f"multiplicity.{name}.{key}",
+                    old_mult["metrics"][name][key],
+                    new_mult["metrics"][name][key],
+                )
 
     return rows
 

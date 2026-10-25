@@ -222,7 +222,7 @@ A/A p = 0.195.
 ```bash
 uv sync --all-groups
 uv run python run.py --stage all      # raw → ingest → sessions → serp → sql → rank → experiment → business
-uv run pytest -q                      # 133 passed, 2 skipped
+uv run pytest -q                      # 145 passed, 2 skipped (147 collected)
 uv run ruff check . && uv run ruff format --check .
 uv run streamlit run app.py           # дашборд на :8501
 ```
@@ -283,7 +283,9 @@ serp-rank-lab/
 Phase 4 подключён почти целиком: feasible-политики, свип чувствительности, headline и
 interleaving-пример считаются в `src/ranking_eval.py`. Мёртвым остаётся только
 `src/calibration.py` — он импортируется тестами, но стадией пайплайна не вызывается.
-`pytest` даёт 133 passed, 2 skipped (два скипаются без опциональных соседних данных).
+`pytest` даёт 145 passed, 2 skipped из 147 собранных (два скипаются без опциональных
+соседних данных). В чистом клоне без `data/processed` пропускаются ещё ~40 — все
+data-gated наборы, поэтому число прошедших там меньше.
 
 ## Методы
 
@@ -302,6 +304,10 @@ interleaving-пример считаются в `src/ranking_eval.py`. Мёрт�
   искусственной корреляцией 0.3353, доказывающий, что оценщик работает.
 - **Последовательное тестирование.** p-value фиксированного горизонта при повторных
   взглядах сравниваются с always-valid mSPRT; взгляды ограничены размером руки.
+- **Множественность.** Вердикт держится на семействе из пяти проверок (primary +
+  четыре guardrail). Holm и BH считает `multiplicity_readout` в `src/experiment.py`,
+  решение принимается по Holm, сырое остаётся в `decision.verdict_raw`. На этом ридауте
+  поправка не переворачивает ни одну метрику.
 - **Ожидаемое vs логированное.** Метрики политик — математические ожидания под новым
   порядком при тех же офферах; логированная выручка на поиск (1 225.63 ₽) отличается от
   `production` в таблице (1 175.80 ₽) на шум розыгрыша. В эксперименте `production`
@@ -323,6 +329,8 @@ interleaving-пример считаются в `src/ranking_eval.py`. Мёрт�
 ## Связанное
 
 - **Диаграмма:** [`docs/diagrams/serp-rank-lab.html`](docs/diagrams/serp-rank-lab.html) — поток данных, открывается в браузере.
+- **Дека:** [`presentations/index.html`](presentations/index.html) — 16 слайдов из готовых фигур
+  (scroll-snap, клавиатура, `file://`), PDF рядом: `presentations/serp-rank-lab-deck.pdf`.
 - **Глоссарий:** [`CONTEXT.md`](CONTEXT.md) — точное значение каждого термина.
 - **Метрики:** [`docs/metric-definitions.md`](docs/metric-definitions.md) — формулы и `file:line`.
 - **Решение:** [`docs/decision-memo.md`](docs/decision-memo.md) — одна страница для стейкхолдера.

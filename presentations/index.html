@@ -1,0 +1,1097 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SERP Rank Lab — ранжирование по деньгам против кликов</title>
+<style>
+  :root{
+    --bg:#0b0e13;
+    --surface:#141a22;
+    --surface-2:#10151c;
+    --ink:#e9ecf1;
+    --muted:#a3adbb;
+    --soft:#76808e;
+    --line:rgba(233,236,241,.14);
+    --line-strong:rgba(233,236,241,.26);
+    --accent:#ff8569;
+    --accent-soft:rgba(255,133,105,.12);
+    --good:#7dd3a7;
+    --bad:#ff7a7a;
+    --warn:#f2c14e;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans);}
+  body{overflow:hidden;}
+  #deck{
+    display:flex;
+    height:100vh;
+    overflow-x:auto;
+    overflow-y:hidden;
+    scroll-snap-type:x mandatory;
+    scroll-behavior:smooth;
+    scrollbar-width:none;
+  }
+  #deck::-webkit-scrollbar{display:none;}
+  .slide{
+    flex:0 0 100vw;
+    width:100vw;
+    height:100vh;
+    scroll-snap-align:start;
+    display:grid;
+    place-items:center;
+    padding:0;
+  }
+  .surface{
+    position:relative;
+    width:min(100vw, calc(100vh * 16 / 9));
+    height:min(100vh, calc(100vw * 9 / 16));
+    background:
+      radial-gradient(1200px 620px at 82% -12%, rgba(255,133,105,.10), transparent 62%),
+      linear-gradient(160deg,#151b24 0%, #10151c 62%, #0d1218 100%);
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:10px;
+    overflow:hidden;
+    padding:clamp(22px,3.1vh,44px) clamp(26px,3.6vw,58px) 48px;
+    display:flex;
+    flex-direction:column;
+    gap:clamp(10px,1.5vh,20px);
+    box-shadow:0 24px 80px rgba(0,0,0,.45);
+  }
+  .kicker{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    font-family:var(--mono);
+    font-size:clamp(9px,1.05vw,12px);
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--soft);
+  }
+  .kicker .tag{
+    color:var(--accent);
+    border:1px solid rgba(255,133,105,.35);
+    background:var(--accent-soft);
+    padding:3px 9px;
+    border-radius:999px;
+    letter-spacing:.1em;
+    white-space:nowrap;
+  }
+  .kicker .tag.modeled{color:var(--warn);border-color:rgba(242,193,78,.35);background:rgba(242,193,78,.10);}
+  h1,h2,h3,p,ul,ol{margin:0;}
+  h1{
+    font-size:clamp(38px,5.8vw,86px);
+    line-height:.98;
+    letter-spacing:-.03em;
+    font-weight:760;
+  }
+  h2{
+    font-size:clamp(25px,3.3vw,45px);
+    line-height:1.04;
+    letter-spacing:-.02em;
+    font-weight:720;
+  }
+  h2 .thin{color:var(--muted);font-weight:560;}
+  h3{
+    font-size:clamp(13px,1.45vw,18px);
+    letter-spacing:.02em;
+    font-weight:650;
+  }
+  .lead{
+    font-size:clamp(15px,1.6vw,21px);
+    line-height:1.35;
+    color:var(--muted);
+  }
+  .lead strong{color:var(--ink);font-weight:640;}
+  .content{flex:1;min-height:0;display:flex;flex-direction:column;gap:clamp(10px,1.5vh,18px);}
+  .content.grid{
+    display:grid;
+    grid-template-columns:minmax(0,.86fr) minmax(0,1.55fr);
+    gap:clamp(18px,2.4vw,34px);
+    align-items:stretch;
+  }
+  .content.grid.wide-text{grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);}
+  .col{display:flex;flex-direction:column;gap:clamp(9px,1.4vh,16px);min-height:0;}
+  .figure{
+    flex:1;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    background:#0a0e13;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:clamp(8px,1.1vw,14px);
+    overflow:hidden;
+  }
+  .figure.light{background:#f6f7f9;}
+  .figure img{
+    display:block;
+    max-width:100%;
+    max-height:100%;
+    width:auto;
+    height:auto;
+    object-fit:contain;
+    border-radius:3px;
+  }
+  .figure figcaption{
+    font-family:var(--mono);
+    font-size:clamp(9px,1vw,11px);
+    color:var(--soft);
+    letter-spacing:.06em;
+    text-align:center;
+    flex:0 0 auto;
+  }
+  .figure.light figcaption{color:#5b6472;}
+  .figgrid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:clamp(8px,1vw,13px);
+    min-height:0;
+    flex:1;
+  }
+  .figgrid .figure{padding:clamp(6px,.8vw,10px);}
+  .figgrid .figure figcaption{font-size:clamp(8px,.85vw,10px);}
+  ul.bullets{list-style:none;padding:0;display:flex;flex-direction:column;gap:clamp(8px,1.25vh,14px);}
+  ul.bullets li{
+    position:relative;
+    padding-left:20px;
+    font-size:clamp(13.5px,1.42vw,18px);
+    line-height:1.36;
+    color:var(--ink);
+  }
+  ul.bullets li::before{
+    content:"";
+    position:absolute;
+    left:2px;top:.56em;
+    width:7px;height:7px;
+    border-radius:2px;
+    background:var(--accent);
+    transform:rotate(45deg);
+  }
+  ul.bullets li .muted{color:var(--muted);}
+  ul.bullets.small li{font-size:clamp(12.5px,1.25vw,16px);}
+  .mono{font-family:var(--mono);font-size:.91em;}
+  .num{font-variant-numeric:tabular-nums;}
+  .accent{color:var(--accent);}
+  .good{color:var(--good);}
+  .bad{color:var(--bad);}
+  .warn{color:var(--warn);}
+  .muted{color:var(--muted);}
+  .soft{color:var(--soft);}
+  .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(12px,1.6vw,20px);}
+  .card{
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:clamp(14px,1.8vh,22px) clamp(14px,1.5vw,20px);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    min-width:0;
+  }
+  .card .card-label{
+    font-family:var(--mono);
+    font-size:clamp(9px,1vw,11px);
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--soft);
+  }
+  .card .big{
+    font-size:clamp(24px,3vw,40px);
+    line-height:1;
+    font-weight:700;
+    letter-spacing:-.02em;
+  }
+  .card p{font-size:clamp(12.5px,1.25vw,16px);line-height:1.34;color:var(--muted);}
+  .card p strong{color:var(--ink);font-weight:620;}
+  .stats{display:flex;flex-wrap:wrap;gap:clamp(10px,1.4vw,18px);}
+  .stat{
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:clamp(10px,1.4vh,16px) clamp(12px,1.3vw,18px);
+    min-width:0;
+    flex:1 1 0;
+  }
+  .stat .v{font-size:clamp(20px,2.4vw,32px);font-weight:710;letter-spacing:-.02em;line-height:1.05;white-space:nowrap;}
+  .stat .k{font-family:var(--mono);font-size:clamp(9px,1vw,11px);color:var(--soft);letter-spacing:.08em;text-transform:uppercase;margin-top:4px;}
+  .bars{display:flex;flex-direction:column;gap:clamp(7px,1vh,11px);}
+  .bar{display:grid;grid-template-columns:clamp(160px,15vw,210px) 1fr clamp(52px,4.5vw,70px);align-items:center;gap:clamp(8px,1vw,14px);font-size:clamp(11px,1.15vw,14.5px);}
+  .bar .bl{color:var(--muted);line-height:1.2;}
+  .bar .track{height:10px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;}
+  .bar .fill{display:block;height:100%;border-radius:999px;}
+  .bar .fill.a{background:linear-gradient(90deg,#f2c14e,#ffb35c);}
+  .bar .fill.b{background:linear-gradient(90deg,#ff6b6b,#ff9a9a);}
+  .bar .fill.c{background:linear-gradient(90deg,#7dd3a7,#a7e8c8);}
+  .bar .bv{font-family:var(--mono);text-align:right;color:var(--ink);white-space:nowrap;}
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:clamp(12.5px,1.32vw,16.5px);
+    line-height:1.28;
+    font-variant-numeric:tabular-nums;
+  }
+  th{
+    text-align:left;
+    font-family:var(--mono);
+    font-size:clamp(9px,1vw,11px);
+    letter-spacing:.09em;
+    text-transform:uppercase;
+    color:var(--soft);
+    font-weight:560;
+    padding:0 10px 7px;
+    border-bottom:1px solid var(--line-strong);
+  }
+  td{
+    padding:clamp(5px,.85vh,9px) 10px;
+    border-bottom:1px solid var(--line);
+    vertical-align:top;
+    color:var(--ink);
+  }
+  tr:last-child td{border-bottom:none;}
+  td.muted,th.muted{color:var(--muted);}
+  td.r,th.r{text-align:right;}
+  .pill{
+    display:inline-block;
+    font-family:var(--mono);
+    font-size:.78em;
+    letter-spacing:.05em;
+    padding:2px 7px;
+    border-radius:999px;
+    border:1px solid transparent;
+    white-space:nowrap;
+  }
+  .pill.bad{color:#ffd0d0;background:rgba(255,122,122,.14);border-color:rgba(255,122,122,.38);}
+  .pill.ok{color:#c8f5e0;background:rgba(125,211,167,.12);border-color:rgba(125,211,167,.32);}
+  .pill.warn{color:#ffe7ac;background:rgba(242,193,78,.12);border-color:rgba(242,193,78,.30);}
+  .verdict{
+    border:1px solid rgba(255,122,122,.45);
+    background:linear-gradient(140deg,rgba(255,122,122,.14),rgba(255,122,122,.04));
+    border-radius:12px;
+    padding:clamp(16px,2.2vh,26px) clamp(18px,2vw,28px);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .verdict .tagline{
+    font-family:var(--mono);
+    font-size:clamp(11px,1.15vw,14px);
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:#ffb3b3;
+  }
+  .verdict .word{
+    font-size:clamp(34px,4.4vw,60px);
+    line-height:1;
+    font-weight:760;
+    letter-spacing:-.03em;
+    color:#ff9a9a;
+  }
+  .verdict p{font-size:clamp(13px,1.4vw,18px);line-height:1.35;color:#f2d6d6;}
+  .callout{
+    border-left:3px solid var(--accent);
+    background:rgba(255,133,105,.06);
+    border-radius:0 8px 8px 0;
+    padding:clamp(10px,1.4vh,15px) clamp(12px,1.3vw,18px);
+    font-size:clamp(12.5px,1.3vw,16.5px);
+    line-height:1.36;
+    color:var(--muted);
+  }
+  .callout strong{color:var(--ink);}
+  .callout.warn{border-left-color:var(--warn);background:rgba(242,193,78,.06);}
+  .pipeline{
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:clamp(8px,1vw,14px);
+    position:relative;
+  }
+  .stage{
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:clamp(10px,1.4vh,16px) clamp(9px,1vw,14px);
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    min-width:0;
+  }
+  .stage .n{
+    font-family:var(--mono);
+    font-size:clamp(9px,1vw,11px);
+    color:var(--accent);
+    letter-spacing:.1em;
+  }
+  .stage .t{font-size:clamp(12.5px,1.25vw,16px);font-weight:650;line-height:1.2;}
+  .stage .d{font-family:var(--mono);font-size:clamp(9px,1vw,11.5px);color:var(--soft);line-height:1.35;}
+  .stage.focal{border-color:rgba(255,133,105,.45);background:rgba(255,133,105,.07);}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:clamp(9px,1vw,11px);color:var(--soft);letter-spacing:.05em;}
+  .legend span::before{
+    content:"";display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:baseline;
+  }
+  .legend .m::before{background:var(--accent);}
+  .legend .s::before{background:var(--warn);}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(16px,2.2vw,30px);min-height:0;}
+  .split .panel{display:flex;flex-direction:column;gap:9px;min-width:0;min-height:0;}
+  .panel-title{
+    font-family:var(--mono);
+    font-size:clamp(10px,1.1vw,13px);
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--accent);
+  }
+  .panel-title.good{color:var(--good);}
+  .panel-title.bad{color:var(--bad);}
+  .footer{
+    display:flex;
+    justify-content:space-between;
+    gap:18px;
+    font-family:var(--mono);
+    font-size:clamp(8.5px,.95vw,11px);
+    letter-spacing:.06em;
+    color:var(--soft);
+    border-top:1px solid var(--line);
+    padding-top:8px;
+    flex:0 0 auto;
+  }
+  .footer .r{text-align:right;}
+  #counter{
+    position:fixed;
+    right:18px;
+    bottom:14px;
+    z-index:20;
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.1em;
+    color:rgba(233,236,241,.55);
+    background:rgba(10,14,19,.72);
+    border:1px solid rgba(255,255,255,.10);
+    border-radius:999px;
+    padding:4px 10px;
+    pointer-events:none;
+    backdrop-filter:blur(6px);
+  }
+  .hint{
+    position:fixed;
+    left:18px;
+    bottom:14px;
+    z-index:20;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.08em;
+    color:rgba(233,236,241,.35);
+    pointer-events:none;
+  }
+  .title-slide h1{font-size:clamp(52px,8vw,118px);}
+  .title-rule{height:2px;background:linear-gradient(90deg,var(--accent),transparent);width:min(420px,60%);border:0;margin:2px 0 4px;}
+  .verdict-inline{display:flex;gap:clamp(14px,2vw,26px);align-items:center;flex-wrap:wrap;}
+  .verdict-inline .word{font-size:clamp(26px,3.4vw,46px);color:#ff9a9a;font-weight:760;letter-spacing:-.02em;line-height:1;}
+  .verdict-inline .sep{width:1px;height:42px;background:var(--line-strong);}
+  .tag-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .tag-row .pill{font-size:clamp(9px,1vw,11.5px);}
+
+  @media print{
+    @page{size:1280px 720px;margin:0;}
+    html,body{width:1280px;height:auto;background:var(--bg);overflow:visible;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    #deck{display:block;width:1280px;Height:auto;overflow:visible;scroll-snap-type:none;}
+    .slide{
+      display:block;
+      width:1280px;
+      height:720px;
+      flex:none;
+      page-break-after:always;
+      break-after:page;
+      scroll-snap-align:none;
+      overflow:hidden;
+    }
+    .slide:last-child{page-break-after:auto;break-after:auto;}
+    .surface{
+      width:1280px;
+      height:720px;
+      border-radius:0;
+      box-shadow:none;
+      border:0;
+    }
+    #counter,.hint{display:none!important;}
+    ul.bullets li{break-inside:avoid;}
+    table{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div id="deck">
+
+  <!-- 01 -->
+  <section class="slide" aria-label="Титул">
+    <div class="surface">
+      <div class="kicker">
+        <span>Портфолио · продуктовая аналитика · A/B</span>
+        <span class="tag modeled">modeled SERP · seed 42</span>
+      </div>
+      <div class="content" style="justify-content:center;gap:clamp(12px,2vh,22px);">
+        <div>
+          <div class="mono soft" style="font-size:clamp(11px,1.2vw,15px);letter-spacing:.15em;text-transform:uppercase;margin-bottom:10px;">SERP Rank Lab</div>
+          <h1>Ранжирование по деньгам:</h1>
+          <h1 style="color:var(--accent);">+34% выручки, −17% кликов</h1>
+          <hr class="title-rule">
+          <p class="lead" style="max-width:64ch;">
+            Метaпоиск авиабилетов. Две политики на <strong>одинаковом</strong> информационном множестве:
+            сортировка по вероятности клика против сортировки по ожидаемой комиссии партнёра.
+            Офлайн обмен выглядит выгодным. Раскатка его не подтвердила.
+          </p>
+        </div>
+        <div class="verdict">
+          <div class="tagline">вердикт раскатки · reports/experiment.json → decision</div>
+          <div class="verdict-inline">
+            <span class="word">do_not_ship</span>
+            <span class="sep"></span>
+            <span class="mono" style="font-size:clamp(12px,1.3vw,16px);color:#ffd0d0;">guardrail breach: <strong>ctr</strong>, <strong>booking_conversion</strong></span>
+          </div>
+          <p>
+            <span class="mono">revenue_objective</span> — <strong>−14,26%</strong> выручки на поиск (p = 0,114, эффект не детектирован);
+            CTR <strong>−13,06%</strong> (p = 7·10⁻⁶); конверсия в бронь <strong>−16,05%</strong> (p = 0,009).
+            Два guardrail'а из четырёх пробиты.
+          </p>
+        </div>
+        <p class="mono soft" style="font-size:clamp(10px,1.05vw,13px);">
+          12 000 поисков · 120 136 офферов · 4 570 пользователей · синтетический SERP поверх реальных пар маршрут/цена.
+          Это модель, а не реальный прод.
+        </p>
+      </div>
+      <div class="footer">
+        <span>SERP Rank Lab · 2026-10-25</span>
+        <span class="r">источники: reports/headline.json · reports/experiment.json · docs/decision-memo.md</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 -->
+  <section class="slide" aria-label="Позиционное смещение">
+    <div class="surface">
+      <div class="kicker"><span>01 · Проблема</span><span class="tag modeled">modeled</span></div>
+      <h2>Позиция решает: наивный CTR смещён <span class="thin">по построению</span></h2>
+      <div class="content grid">
+        <div class="col">
+          <ul class="bullets">
+            <li>Вероятность клика раскладывается на осмотр и релевантность:<br><span class="mono muted">P(click) = examine_prob(k) × relevance</span></li>
+            <li>Кривая осмотра убывает с позицией: <span class="mono">examine_prob(k) = (1/k)^η</span>, где η = <strong>1,3</strong> на мобильных и <strong>1,0</strong> на десктопе.</li>
+            <li>Наивный CTR <strong>0,163</strong> против позиционно-свободного <strong>0,629</strong> — расхождение в <strong>3,86 раза</strong>.</li>
+            <li>Вывод: ранкеры нельзя сравнивать по сырым кликам. Нужен inverse-propensity weighting по позиции.</li>
+          </ul>
+          <div class="callout">
+            Если не корректировать смещение, политика, которая просто ставит дорогие офферы выше,
+            выглядит «лучше» по кликам — и решение принимается по артефакту механики показа.
+          </div>
+        </div>
+        <figure class="figure">
+          <img src="../reports/figures/position_bias.png" alt="Средняя вероятность осмотра по позициям, mobile и desktop">
+          <figcaption>reports/figures/position_bias.png · modeled</figcaption>
+        </figure>
+      </div>
+      <div class="footer"><span>Позиционное смещение</span><span class="r">reports/ranking_eval.json → ctr · src/serp_sim.py</span></div>
+    </div>
+  </section>
+
+  <!-- 03 -->
+  <section class="slide" aria-label="Экономика позиции">
+    <div class="surface">
+      <div class="kicker"><span>02 · Экономика позиции</span><span class="tag modeled">modeled</span></div>
+      <h2>Позиция 1 забирает <span class="accent">47,3%</span> всей комиссии</h2>
+      <div class="content grid">
+        <div class="col">
+          <ul class="bullets">
+            <li><strong>94,6%</strong> офферов приносят нулевую комиссию; положительная — тяжёлый хвост (skew 7,79) на 120 136 показах.</li>
+            <li>Воронка <span class="mono">impression → click → redirect → book</span> падает быстрее, чем <span class="mono">1/k</span>: верхние слоты забирают и клики, и брони.</li>
+            <li>Первичная метрика — отношение сумм, а не среднее отношений:<br><span class="mono muted">revenue per search = sum(commission) / count(distinct search_id)</span></li>
+            <li>Поэтому дисперсия считается дельта-методом с кластером <span class="mono">user_id</span>, а не наивно по юнитам.</li>
+          </ul>
+          <div class="callout">
+            Деньги на странице распределены неравномерно. Любая перестановка слотов — это одновременно
+            перераспределение выручки и пользовательского внимания.
+          </div>
+        </div>
+        <div class="col">
+          <figure class="figure">
+            <img src="../reports/figures/funnel_by_position.png" alt="Воронка показов, кликов, редиректов и броней по позициям">
+            <figcaption>reports/figures/funnel_by_position.png · modeled</figcaption>
+          </figure>
+          <figure class="figure">
+            <img src="../reports/figures/cumulative_revenue_share.png" alt="Накопленная доля комиссии по позициям SERP">
+            <figcaption>reports/figures/cumulative_revenue_share.png · modeled</figcaption>
+          </figure>
+        </div>
+      </div>
+      <div class="footer"><span>Экономика позиции</span><span class="r">reports/figures/funnel_by_position.png · cumulative_revenue_share.png · reports/eda/figures/fig1, fig2</span></div>
+    </div>
+  </section>
+
+  <!-- 04 -->
+  <section class="slide" aria-label="Данные и пайплайн">
+    <div class="surface">
+      <div class="kicker"><span>03 · Данные и пайплайн</span><span class="tag modeled">modeled ≠ measured</span></div>
+      <h2>Два слоя, которые <span class="thin">не смешиваются</span></h2>
+      <div class="content">
+        <div class="pipeline">
+          <div class="stage"><span class="n">01 · INGEST</span><span class="t">Сырые ленты</span><span class="d">orders · bookings_legs · events · sessions</span></div>
+          <div class="stage"><span class="n">02 · MODEL</span><span class="t">Синтетический SERP</span><span class="d">route × price → serp_offers</span></div>
+          <div class="stage"><span class="n">03 · RANK A</span><span class="t">Клик-цель</span><span class="d">p̂ без ground truth</span></div>
+          <div class="stage focal"><span class="n">04 · RANK B</span><span class="t">Денежная цель</span><span class="d">p̂ × commission</span></div>
+          <div class="stage"><span class="n">05 · READOUT</span><span class="t">NDCG · MRR · ₽/поиск</span><span class="d">офлайн и A/B</span></div>
+        </div>
+        <div class="split" style="flex:1;min-height:0;">
+          <div class="panel">
+            <span class="panel-title">modeled — синтетика</span>
+            <ul class="bullets small">
+              <li><span class="mono">serp_offers</span>: <strong>120 136</strong> офферов, <strong>12 000</strong> поисков, 8 партнёров, 15 позиций.</li>
+              <li>Построен поверх <strong>реальных</strong> пар маршрут/цена; клики, брони и комиссия разыграны моделью.</li>
+              <li>Эксперимент: <strong>6 000</strong> удержанных поисков, <strong>3 491</strong> пользователь — вторая половина после обучения.</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <span class="panel-title warn" style="color:var(--warn);">measured — реальные острова</span>
+            <ul class="bullets small">
+              <li><span class="mono">orders</span>: 8 966 строк / <strong>8 803</strong> заказа (строка = заказ × услуга, 163 дубликата `order_id`).</li>
+              <li><span class="mono">bookings_legs</span>, <span class="mono">events</span>, <span class="mono">sessions</span> — измеренные.</li>
+              <li>Единственный join кликстрима — <span class="mono">user_id</span>; <span class="mono">orders</span> и <span class="mono">bookings_legs</span> — острова без FK.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="v">120 136</div><div class="k">офферов</div></div>
+          <div class="stat"><div class="v">12 000</div><div class="k">поисков</div></div>
+          <div class="stat"><div class="v">4 570</div><div class="k">пользователей</div></div>
+          <div class="stat"><div class="v">6 000 / 3 491</div><div class="k">поиски / users в эксперименте</div></div>
+          <div class="stat"><div class="v">8 · 15</div><div class="k">партнёров · позиций</div></div>
+        </div>
+      </div>
+      <div class="footer"><span>Пайплайн: ingest → model → rank A/B → readout</span><span class="r">reports/experiment.json → inputs · business.json · CONTEXT.md</span></div>
+    </div>
+  </section>
+
+  <!-- 05 -->
+  <section class="slide" aria-label="Дизайн эксперимента">
+    <div class="surface">
+      <div class="kicker"><span>04 · Дизайн эксперимента</span><span class="tag">fixed horizon</span></div>
+      <h2>90/10 по <span class="mono">user_id</span>, удержанные поиски, <span class="thin">5% MDE только для сайзинга</span></h2>
+      <div class="content">
+        <table>
+          <thead><tr><th style="width:26%">Параметр</th><th>Значение</th></tr></thead>
+          <tbody>
+            <tr><td>Сплит</td><td>90/10 · <span class="mono">test_share = 0,1</span></td></tr>
+            <tr><td>Единица рандомизации</td><td><span class="mono">user_id</span>; кластер анализа — тоже пользователь; руки дизъюнктны (3 151 + 340 = 3 491)</td></tr>
+            <tr><td>Политики</td><td><span class="mono">control = production</span> · <span class="mono">test = revenue_objective</span></td></tr>
+            <tr><td>Информационное множество</td><td><span class="mono">logged</span>: цена, тип партнёра, позиция. Оракульная релевантность не читается</td></tr>
+            <tr><td>Первичная метрика</td><td><span class="mono">revenue per search</span> — ratio-метрика, дельта-метод, кластер <span class="mono">user_id</span></td></tr>
+            <tr><td>Guardrails · 4</td><td>CTR ↓ · booking conversion ↓ · mean price top-5 ↑ · share above SERP median ↑</td></tr>
+            <tr><td>α / power</td><td>0,05 / 0,80</td></tr>
+            <tr><td>Правило остановки</td><td>guardrail хуже <strong>10%</strong> в вредную сторону <strong>и</strong> значим на 5% → не катим</td></tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <strong>Сайзинг против факта.</strong> План на 5% относительных требует <strong>91 396</strong> пользователей при 90/10
+          (82 257 контроль / 9 140 тест). Фактический прогон — 3 491 пользователь. Это недомощный прогон:
+          MDE 15,57% больше наблюдаемого эффекта.
+        </div>
+      </div>
+      <div class="footer"><span>Дизайн</span><span class="r">reports/experiment.json → design · sample_size · docs/ab-test-analysis.md</span></div>
+    </div>
+  </section>
+
+  <!-- 06 -->
+  <section class="slide" aria-label="Валидность">
+    <div class="surface">
+      <div class="kicker"><span>05 · Валидность</span><span class="tag">checks</span></div>
+      <h2>SRM нет, A/A чистый, <span class="thin">воздействие реальное</span></h2>
+      <div class="content">
+        <div class="cards">
+          <div class="card">
+            <span class="card-label">SRM · vs плановый 90/10</span>
+            <span class="big">9,74%</span>
+            <p>Наблюдаемая доля теста при плане 10%. χ² = 0,264, <strong>p = 0,608</strong> → mismatch нет.
+            Контроль 3 151 / тест 340 пользователей.</p>
+          </div>
+          <div class="card">
+            <span class="card-label">A/A · контроль пополам</span>
+            <span class="big">p = 0,195</span>
+            <p>1 265,48 ₽ против 1 174,42 ₽; разница −91,06 ₽. Не значимо: тест не «шумит» на пустом воздействии.</p>
+          </div>
+          <div class="card">
+            <span class="card-label">Treatment check</span>
+            <span class="big">96,9%</span>
+            <p>Поисков переранжировано; сдвинуто <strong>77,6%</strong> офферов, средний |Δпозиция| = <strong>2,56</strong>.
+            Сопоставлено 59 878 / 59 878 офферов.</p>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Проверка</th><th class="r">Контроль</th><th class="r">Тест</th><th class="r">Разница</th><th class="r">p-value</th><th>Вывод</th></tr></thead>
+          <tbody>
+            <tr><td>SRM vs 90/10</td><td class="r">3 151</td><td class="r">340</td><td class="r">9,74% vs 10%</td><td class="r">0,608</td><td><span class="pill ok">SRM нет</span></td></tr>
+            <tr><td>A/A (две половины контроля)</td><td class="r">1 265,48 ₽</td><td class="r">—</td><td class="r">−91,06 ₽</td><td class="r">0,195</td><td><span class="pill ok">не значимо</span></td></tr>
+            <tr><td>SRM vs 50/50</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">≈ 0</td><td><span class="pill warn">информационно</span></td></tr>
+          </tbody>
+        </table>
+        <p class="muted" style="font-size:clamp(12px,1.25vw,15.5px);line-height:1.35;">
+          Проверка против 50/50 на плановом сплите 90/10 неприменима: она лишь показывает, что данные не похожи
+          на равное деление. Все числа — <span class="mono">reports/experiment.json</span>, пересчитаны из <span class="mono">serp_offers.parquet</span>.
+        </p>
+      </div>
+      <div class="footer"><span>Валидность</span><span class="r">experiment.json → srm · aa_test · arms.treatment_check</span></div>
+    </div>
+  </section>
+
+  <!-- 07 -->
+  <section class="slide" aria-label="Первичная метрика">
+    <div class="surface">
+      <div class="kicker"><span>06 · Первичная метрика</span><span class="tag modeled">simulated outcomes</span></div>
+      <h2>Выручка на поиск: <span class="bad">−14,26%</span>, <span class="thin">интервал накрывает ноль</span></h2>
+      <div class="content">
+        <table>
+          <thead><tr><th>Группа</th><th class="r">Пользователи</th><th class="r">Поиски</th><th class="r">Выручка / поиск</th><th class="r">Δ</th></tr></thead>
+          <tbody>
+            <tr><td>A — <span class="mono">production</span></td><td class="r">3 151</td><td class="r">5 416</td><td class="r"><strong>1 221,28 ₽</strong></td><td class="r">—</td></tr>
+            <tr><td>B — <span class="mono">revenue_objective</span></td><td class="r">340</td><td class="r">584</td><td class="r"><strong>1 047,08 ₽</strong></td><td class="r">−174,20 ₽</td></tr>
+            <tr><td>Δ (B − A)</td><td class="r">—</td><td class="r">—</td><td class="r"><span class="bad">−14,26%</span></td><td class="r">−174,20 ₽</td></tr>
+          </tbody>
+        </table>
+        <div class="split" style="flex:1;min-height:0;">
+          <div class="panel">
+            <span class="panel-title">Статистика · дельта-метод</span>
+            <table>
+              <tbody>
+                <tr><td>SE</td><td class="r">110,14 ₽</td></tr>
+                <tr><td>z</td><td class="r">−1,58</td></tr>
+                <tr><td>p-value</td><td class="r">0,1137</td></tr>
+                <tr><td>95% CI, абс.</td><td class="r">[−390,06; +41,67] ₽</td></tr>
+                <tr><td>95% CI, отн.</td><td class="r">[−31,94%; +3,41%]</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <span class="panel-title warn" style="color:var(--warn);">Как это читать</span>
+            <ul class="bullets small">
+              <li>Точка отрицательная, но <strong>не значима</strong>: ноль внутри интервала.</li>
+              <li>Наивная пер-юнит оценка даёт SE 122,04 ₽ (в <strong>1,108 раза</strong> шире) и p = 0,223.
+              Кластеризация по <span class="mono">user_id</span> — не косметика.</li>
+              <li>MDE этого прогона — <strong>15,57%</strong>: эффект −14,26% на таком n не мог стать значимым.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout">
+          Корректная формулировка — <strong>«эффект не детектирован»</strong>, а не «выручка не изменилась».
+          Решение ниже держится не на первичной метрике, а на guardrail'ах.
+        </div>
+      </div>
+      <div class="footer"><span>Primary metric</span><span class="r">experiment.json → primary · power.run</span></div>
+    </div>
+  </section>
+
+  <!-- 08 -->
+  <section class="slide" aria-label="Guardrails и гетерогенность">
+    <div class="surface">
+      <div class="kicker"><span>07 · Guardrails · гетерогенность</span><span class="tag modeled">simulated outcomes</span></div>
+      <h2>Два guardrail'а пробиты, <span class="thin">падение CTR — в обоих устройствах</span></h2>
+      <div class="content">
+        <table>
+          <thead><tr><th>Guardrail</th><th class="r">Control</th><th class="r">Test</th><th class="r">Δ отн.</th><th class="r">p raw</th><th class="r">p Holm</th><th>Статус</th></tr></thead>
+          <tbody>
+            <tr><td>CTR (clicks / offers)</td><td class="r">16,47%</td><td class="r">14,32%</td><td class="r bad">−13,06%</td><td class="r">7,0·10⁻⁶</td><td class="r">3,5·10⁻⁵</td><td><span class="pill bad">breach</span></td></tr>
+            <tr><td>Booking conversion</td><td class="r">29,99%</td><td class="r">25,17%</td><td class="r bad">−16,05%</td><td class="r">0,0088</td><td class="r">0,035</td><td><span class="pill bad">breach</span></td></tr>
+            <tr><td>Mean price top-5</td><td class="r">54 511,88 ₽</td><td class="r">54 288,30 ₽</td><td class="r">−0,41%</td><td class="r">0,837</td><td class="r">0,899</td><td><span class="pill ok">ok</span></td></tr>
+            <tr><td>Share above SERP median</td><td class="r">47,31%</td><td class="r">47,22%</td><td class="r">−0,18%</td><td class="r">0,449</td><td class="r">0,899</td><td><span class="pill ok">ok</span></td></tr>
+          </tbody>
+        </table>
+        <div class="split" style="flex:1;min-height:0;">
+          <div class="panel">
+            <span class="panel-title bad">Гетерогенность по устройству · CTR, BH по 2</span>
+            <table>
+              <thead><tr><th>Сегмент</th><th class="r">Control</th><th class="r">Test</th><th class="r">Δ</th><th class="r">p (BH)</th><th class="r">MDE</th></tr></thead>
+              <tbody>
+                <tr><td>mobile</td><td class="r">14,93%</td><td class="r">13,45%</td><td class="r bad">−9,91%</td><td class="r">0,0124</td><td class="r">6,24%</td></tr>
+                <tr><td>desktop</td><td class="r">19,02%</td><td class="r">15,80%</td><td class="r bad">−16,92%</td><td class="r">0,0004</td><td class="r">7,34%</td></tr>
+              </tbody>
+            </table>
+            <p class="muted" style="font-size:clamp(11.5px,1.15vw,14.5px);line-height:1.35;">
+              Падение в обоих сегментах — не артефакт одного устройства. Выручка по сегментам <strong>намеренно не тестируется</strong>:
+              мощности на неё нет.
+            </p>
+          </div>
+          <div class="panel">
+            <span class="panel-title warn" style="color:var(--warn);">Граница правила</span>
+            <ul class="bullets small">
+              <li>Пробой засчитан по <strong>точечной оценке + значимости</strong>, а не по всему интервалу.</li>
+              <li>У CTR 95% CI [−18,75%; −7,36%]: точка переходит −10%, но ближняя к нулю граница — нет.</li>
+              <li>Это записано явно, чтобы правило не выглядело строже, чем оно есть.</li>
+              <li>Holm по семейству из 5 проверок (primary + 4 guardrail): CTR p = 3,5·10⁻⁵ · booking p = 0,035 — пробой устойчив, вердикт не переворачивается.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="footer"><span>Guardrails</span><span class="r">experiment.json → guardrails · heterogeneity · docs/ab-test-analysis.md</span></div>
+    </div>
+  </section>
+
+  <!-- 09 -->
+  <section class="slide" aria-label="Мощность и MDE">
+    <div class="surface">
+      <div class="kicker"><span>08 · Мощность</span><span class="tag">scenario ≠ measured</span></div>
+      <h2>Наблюдаемый эффект <span class="bad">ниже MDE</span> этого прогона</h2>
+      <div class="content">
+        <table>
+          <thead><tr><th>Прогон</th><th class="r">Поиски</th><th class="r">Пользователи</th><th class="r">MDE, отн.</th><th>Статус</th></tr></thead>
+          <tbody>
+            <tr><td>Этот ридаут · удержанная половина</td><td class="r">6 000</td><td class="r">3 491</td><td class="r"><strong>15,57%</strong></td><td><span class="pill ok">реальный прогон</span></td></tr>
+            <tr><td>Реальный трафик</td><td class="r">12 000</td><td class="r">4 570</td><td class="r"><strong>13,61%</strong></td><td><span class="pill ok">реальный объём</span></td></tr>
+            <tr><td>Сценарий · 60 000 поисков</td><td class="r">60 000</td><td class="r">22 850</td><td class="r">6,08%</td><td><span class="pill warn">is_scenario: ре-симуляция</span></td></tr>
+          </tbody>
+        </table>
+        <div class="stats">
+          <div class="stat"><div class="v">2 079</div><div class="k">users / рука при 50/50</div></div>
+          <div class="stat"><div class="v">5 459</div><div class="k">поисков / рука</div></div>
+          <div class="stat"><div class="v">10 395 / 1 155</div><div class="k">control / test при 90/10</div></div>
+          <div class="stat"><div class="v">−14,26%</div><div class="k">наблюдаемый эффект</div></div>
+        </div>
+        <div class="bars" aria-hidden="true">
+          <div class="bar"><span class="bl">MDE · этот прогон</span><span class="track"><span class="fill a" style="width:97.3%"></span></span><span class="bv">15,57%</span></div>
+          <div class="bar"><span class="bl">Наблюдаемый эффект</span><span class="track"><span class="fill b" style="width:89.1%"></span></span><span class="bv">−14,26%</span></div>
+          <div class="bar"><span class="bl">MDE · реальный трафик</span><span class="track"><span class="fill c" style="width:85.1%"></span></span><span class="bv">13,61%</span></div>
+        </div>
+        <div class="callout warn">
+          <strong>Недомощность, а не отсутствие эффекта.</strong> p = 0,114 — следствие того, что MDE 15,57% больше
+          наблюдаемого −14,26%. Флаг <span class="mono">detectable_at_real_traffic: true</span> — круговая инференция:
+          он посчитан из того же наблюдаемого эффекта. Честная величина — MDE при фактическом n.
+        </div>
+        <p class="muted" style="font-size:clamp(11.5px,1.2vw,15px);line-height:1.35;">
+          Сценарий на 60 000 поисков требует <strong>ре-симуляции</strong>, а не «дополнительных данных».
+          Размер руки ниже плана: сайзинг на 5% просил 91 396 пользователей.
+        </p>
+      </div>
+      <div class="footer"><span>Power / MDE</span><span class="r">experiment.json → power · required_n_at_planned_split</span></div>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section class="slide" aria-label="CUPED">
+    <div class="surface">
+      <div class="kicker"><span>09 · CUPED</span><span class="tag">honest null</span></div>
+      <h2>Машинерия работает, <span class="thin">объяснять нечего</span></h2>
+      <div class="content">
+        <table>
+          <thead><tr><th>Показатель</th><th class="r">Реальные данные</th><th class="r">Позитивный контроль</th></tr></thead>
+          <tbody>
+            <tr><td>Ковариата</td><td class="r">revenue per search за предпериод</td><td class="r">synthetic latent (ρ = 0,6)</td></tr>
+            <tr><td>θ</td><td class="r">−0,0066</td><td class="r">0,3416</td></tr>
+            <tr><td>corr(x, y)</td><td class="r">−0,0065</td><td class="r">0,3353</td></tr>
+            <tr><td>Сокращение дисперсии</td><td class="r"><strong>0,0042%</strong></td><td class="r"><strong>11,24%</strong></td></tr>
+            <tr><td>Сужение CI</td><td class="r">0,0017%</td><td class="r">5,82%</td></tr>
+            <tr><td>Пользователей</td><td class="r">2 294</td><td class="r">2 294</td></tr>
+          </tbody>
+        </table>
+        <div class="split" style="flex:1;min-height:0;">
+          <div class="panel">
+            <span class="panel-title">Реальный результат</span>
+            <p class="lead" style="font-size:clamp(12.5px,1.3vw,16.5px);">
+              Пользователи i.i.d.: пре-период не связан с целевой метрикой, объяснять нулевой сигнал нечем.
+              Это <strong>честный ноль</strong>, а не сломанный CUPED.
+            </p>
+          </div>
+          <div class="panel">
+            <span class="panel-title good">Позитивный контроль</span>
+            <p class="lead" style="font-size:clamp(12.5px,1.3vw,16.5px);">
+              На сконструированном сигнале оценщик снимает <strong>11,24%</strong> дисперсии — значит, код жив.
+              Корреляция <strong>намеренно не вшита</strong> в симулятор, чтобы «заработал» CUPED (ADR 0002).
+            </p>
+          </div>
+        </div>
+        <div class="callout">
+          Отсутствие выигрыша от CUPED здесь — свойство данных, а не повод его выбрасывать.
+          Если появится реальная пре-периодная история, оценщик уже проверен.
+        </div>
+      </div>
+      <div class="footer"><span>CUPED</span><span class="r">experiment.json → cuped · docs/adr/0002-idempotent-users-no-cuped-signal.md</span></div>
+    </div>
+  </section>
+
+  <!-- 11 -->
+  <section class="slide" aria-label="Peeking">
+    <div class="surface">
+      <div class="kicker"><span>10 · Peeking</span><span class="tag">simulation · 400 runs</span></div>
+      <h2>Подглядывание: <span class="bad">15%</span> ложных срабатываний против <span class="good">0%</span></h2>
+      <div class="content grid">
+        <div class="col">
+          <ul class="bullets">
+            <li>400 симуляций; <strong>6 из 10</strong> запрошенных «взглядов» отработано: рука 1 500 пользователей, батч 250 — остальные дублировались бы.</li>
+            <li>Наивный p-value при повторных взглядах даёт FPR <strong>15,0%</strong>; always-valid mSPRT — <strong>0,0%</strong> на тех же прогонах.</li>
+            <li>τ = 61,06; дублированных промежуточных срезов — 0.</li>
+            <li>Inflation factor не считается: знаменатель mSPRT нулевой.</li>
+          </ul>
+          <div class="callout">
+            Поэтому ридаут — <strong>фиксированный горизонт</strong>. Любые промежуточные взгляды — только через
+            always-valid тест, иначе FPR раздувается втрое.
+          </div>
+        </div>
+        <figure class="figure">
+          <img src="../reports/peeking.png" alt="Ложноположительные срабатывания при наивном подглядывании и mSPRT">
+          <figcaption>reports/peeking.png · 400 симуляций</figcaption>
+        </figure>
+      </div>
+      <div class="footer"><span>Peeking</span><span class="r">experiment.json → peeking · src/experiment.py:960</span></div>
+    </div>
+  </section>
+
+  <!-- 12 -->
+  <section class="slide" aria-label="Сигнал против цели">
+    <div class="surface">
+      <div class="kicker"><span>11 · Почему провал</span><span class="tag modeled">modeled</span></div>
+      <h2>Узкое место — <span class="accent">сигнал</span>, а не целевая функция</h2>
+      <div class="content">
+        <div class="stats">
+          <div class="stat"><div class="v">826,56 ₽</div><div class="k">ctr_objective = propensity</div></div>
+          <div class="stat"><div class="v">843,91 ₽</div><div class="k">price_asc · одна переменная</div></div>
+          <div class="stat"><div class="v">1 175,80 ₽</div><div class="k">production · видит ground truth</div></div>
+          <div class="stat"><div class="v">1 111,30 ₽</div><div class="k">revenue_objective · цена сигнала</div></div>
+        </div>
+        <div class="figgrid" style="flex:0 0 auto;grid-template-columns:1fr 1.25fr;margin:auto 0;">
+          <figure class="figure">
+            <img src="../reports/figures/ranking_divergence.png" alt="NDCG и выручка на поиск по политикам ранжирования">
+            <figcaption>reports/figures/ranking_divergence.png · modeled · NDCG против ₽/поиск по политикам</figcaption>
+          </figure>
+          <figure class="figure">
+            <img src="../reports/figures/sensitivity_sweep.png" alt="Свип по money tilt и силе позиционного смещения">
+            <figcaption>reports/figures/sensitivity_sweep.png · modeled · NDCG 1,000 → 0,913; выручка 1 178–1 196 ₽ при tilt 0,5–1,0; η ∈ [0,6; 1,6] знак разрыва не меняет</figcaption>
+          </figure>
+        </div>
+      </div>
+      <div class="footer"><span>Сигнал против цели</span><span class="r">ranking_eval.json → policies · sensitivity · reports/figures/ranking_divergence.png · README.md</span></div>
+    </div>
+  </section>
+
+  <!-- 13 -->
+  <section class="slide" aria-label="Бизнес-контекст">
+    <div class="surface">
+      <div class="kicker"><span>12 · Бизнес-контекст</span><span class="tag">measured</span></div>
+      <h2>Измеренный слой: <span class="thin">география, маршруты, сезонность</span></h2>
+      <div class="content grid">
+        <div class="col">
+          <ul class="bullets">
+            <li>RU → RU — <strong>65,2%</strong> заказов (5 849 из 8 966). Второе направление RU → TR — 2,2%.</li>
+            <li>Топ-3 маршрута: <span class="mono">SVO→LED</span> 43,3%, <span class="mono">VKO→LED</span> 38,6%, <span class="mono">DME→LED</span> 13,9% — <strong>95,8%</strong> ног на одном направлении.</li>
+            <li>Пик бронирований: июнь <strong>16,4%</strong>, июль 16,0%, август 15,1% (в данных 8 месяцев).</li>
+            <li>78,2% броней — один пассажир; 39,1% заказов — desktop.</li>
+          </ul>
+          <div class="callout warn">
+            <span class="mono">orders</span> и <span class="mono">bookings_legs</span> — <strong>острова</strong>: нет FK к кликстриму
+            и нет пересечения по времени с <span class="mono">events</span>. Эти числа описывают спрос, но не связаны
+            с конкретным ранжированием.
+          </div>
+        </div>
+        <div class="figgrid">
+          <figure class="figure">
+            <img src="../reports/figures/geo.png" alt="Топ пар стран отправления и назначения по числу заказов">
+            <figcaption>reports/figures/geo.png · measured</figcaption>
+          </figure>
+          <figure class="figure">
+            <img src="../reports/figures/routes.png" alt="Топ маршрутов отправления и назначения по числу ног">
+            <figcaption>reports/figures/routes.png · measured</figcaption>
+          </figure>
+          <figure class="figure">
+            <img src="../reports/figures/seasonality.png" alt="Число ног по месяцу бронирования">
+            <figcaption>reports/figures/seasonality.png · measured</figcaption>
+          </figure>
+          <figure class="figure">
+            <img src="../reports/figures/partner_quadrant.png" alt="CTR против комиссии по офферам, размер — число показов">
+            <figcaption>reports/figures/partner_quadrant.png · modeled</figcaption>
+          </figure>
+        </div>
+      </div>
+      <div class="footer"><span>Измеренный слой</span><span class="r">reports/business.json · orders · routes · reports/figures/geo · routes · seasonality · partner_quadrant</span></div>
+    </div>
+  </section>
+
+  <!-- 14 -->
+  <section class="slide" aria-label="EDA">
+    <div class="surface">
+      <div class="kicker"><span>13 · EDA-контекст</span><span class="tag modeled">modeled SERP</span></div>
+      <h2>Комиссия <span class="thin">сконцентрирована и тяжелохвостая</span></h2>
+      <div class="content">
+        <div class="stats">
+          <div class="stat"><div class="v">94,6%</div><div class="k">офферов с нулевой комиссией</div></div>
+          <div class="stat"><div class="v">47,3%</div><div class="k">комиссии даёт позиция 1</div></div>
+          <div class="stat"><div class="v">99,3%</div><div class="k">комиссии — топ-5 партнёров</div></div>
+          <div class="stat"><div class="v">7,79</div><div class="k">skew положительной комиссии</div></div>
+        </div>
+        <div class="figgrid" style="flex:1;">
+          <figure class="figure light">
+            <img src="../reports/eda/figures/fig1_commission_distribution.png" alt="Распределение комиссии по офферам">
+            <figcaption>fig1_commission_distribution.png · modeled · dpi 300</figcaption>
+          </figure>
+          <figure class="figure light">
+            <img src="../reports/eda/figures/fig2_commission_by_position.png" alt="Распределение комиссии по позициям SERP">
+            <figcaption>fig2_commission_by_position.png · modeled · dpi 300</figcaption>
+          </figure>
+          <figure class="figure light">
+            <img src="../reports/eda/figures/fig3_commission_by_partner.png" alt="Комиссия по партнёрам">
+            <figcaption>fig3_commission_by_partner.png · modeled · dpi 300</figcaption>
+          </figure>
+          <figure class="figure light">
+            <img src="../reports/eda/figures/fig4_position_bias.png" alt="Позиционное смещение в кликах">
+            <figcaption>fig4_position_bias.png · modeled · dpi 300</figcaption>
+          </figure>
+        </div>
+        <p class="muted" style="font-size:clamp(11.5px,1.2vw,15px);line-height:1.35;">
+          Ценность позиции убывает быстрее, чем <span class="mono">1/k</span>; CPA — 99,3% комиссии, CPC платит за клик.
+          Сдвиг слота меняет, кто получит комиссию, а не только порядок ссылок.
+        </p>
+      </div>
+      <div class="footer"><span>EDA</span><span class="r">reports/eda/scripts/plot_serp.py · fig1–fig4</span></div>
+    </div>
+  </section>
+
+  <!-- 15 -->
+  <section class="slide" aria-label="Вердикт">
+    <div class="surface">
+      <div class="kicker"><span>14 · Вердикт</span><span class="tag modeled">модель, не прод</span></div>
+      <h2><span class="bad">do_not_ship</span> — и что именно мы не катим</h2>
+      <div class="content">
+        <div class="verdict">
+          <div class="tagline">reports/experiment.json → decision</div>
+          <div class="verdict-inline">
+            <span class="word">do_not_ship</span>
+            <span class="sep"></span>
+            <span class="mono" style="font-size:clamp(12px,1.3vw,16px);color:#ffd0d0;">guardrail breach: ctr, booking_conversion · primary_significant: false</span>
+          </div>
+          <p>Правило остановки: guardrail хуже 10% в вредную сторону <strong>и</strong> значим на 5% — стоп независимо от выручки.
+          Оно сработало в первом же прогоне.</p>
+        </div>
+        <div class="split" style="flex:1;min-height:0;">
+          <div class="panel">
+            <span class="panel-title bad">Не катим</span>
+            <ul class="bullets small">
+              <li><span class="mono">revenue_objective</span> — два guardrail'а пробиты, выручка не значимо ниже.</li>
+              <li><span class="mono">ctr_objective</span> — 826,56 ₽/поиск: хуже <span class="mono">production</span> (1 175,80) и хуже <span class="mono">price_asc</span> (843,91).</li>
+              <li>Оракульный «потолок» +38% — только как <span class="mono">modeled</span>: разрыв сконструирован антикорреляцией, а не найден в данных.</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <span class="panel-title good">Катим</span>
+            <ul class="bullets small">
+              <li><span class="mono">production</span> + guardrail-правило как процесс.</li>
+              <li>Не менять цель, а <strong>добавлять признаки</strong>: цена относительно медианы маршрута, история партнёра, глубина просмотра.</li>
+              <li>Планировать размер заранее: 2 079 users/рука при 50/50; 10 395 / 1 155 при 90/10.</li>
+              <li>Любые промежуточные взгляды — через mSPRT, не наивный p-value.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout">
+          <strong>Что изменит решение:</strong> CI по выручке исключает ноль в плюс · guardrail пробит и на другой цели ·
+          найден внешний курс «клик → деньги» (981,83 ₽ за потерянный клик), при котором обмен выгоден.
+        </div>
+        <p class="mono soft" style="font-size:clamp(10px,1.05vw,13px);">
+          Все эффекты в колоде — симуляция поверх синтетического SERP (seed 42). Это не результат реального продакшена.
+        </p>
+      </div>
+      <div class="footer"><span>Решение</span><span class="r">experiment.json → decision · docs/decision-memo.md</span></div>
+    </div>
+  </section>
+
+  <!-- 16 -->
+  <section class="slide" aria-label="Приложение: метрики">
+    <div class="surface">
+      <div class="kicker"><span>15 · Приложение</span><span class="tag">definitions</span></div>
+      <h2>Определения метрик <span class="thin">и границы данных</span></h2>
+      <div class="content">
+        <table>
+          <thead><tr><th style="width:22%">Термин</th><th>Определение</th><th style="width:27%">Граница / источник</th></tr></thead>
+          <tbody>
+            <tr><td><span class="mono">revenue</span> = commission</td><td>CPA: <span class="mono">commission_rate × price</span> при брони; CPC при клике; 0 иначе</td><td>только <span class="mono">serp_offers</span>, не цена билета и не прибыль</td></tr>
+            <tr><td><span class="mono">revenue per search</span></td><td><span class="mono">sum(commission) / count(distinct search_id)</span> — ratio-метрика</td><td>дельта-метод, кластер <span class="mono">user_id</span></td></tr>
+            <tr><td><span class="mono">expected_revenue</span></td><td><span class="mono">P(click) × revenue_if_engaged</span>; <span class="mono">P(click) = examine × relevance</span></td><td>ground truth симулятора — только оракулы</td></tr>
+            <tr><td><span class="mono">order_value</span></td><td><span class="mono">orders.order_price</span></td><td>цена брони, <strong>не</strong> выручка сайта</td></tr>
+            <tr><td><span class="mono">service_profit</span></td><td>прибыль на доп. услуге; размечена у <strong>20,4%</strong> строк, медиана 399,2 ₽</td><td>остальные — не нули, а отсутствие метки</td></tr>
+            <tr><td>Guardrails · 4</td><td>CTR ↓ · booking conversion ↓ · mean top-5 price ↑ · share above median ↑</td><td>порог 10% в вредную сторону + p &lt; 0,05</td></tr>
+            <tr><td><span class="mono">refund rate</span></td><td>240 из 8 966 строк услуг — <strong>2,68%</strong></td><td><strong>не</strong> guardrail: нет join между <span class="mono">orders</span> и ранжированием</td></tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <strong>163 дубликата <span class="mono">order_id</span>:</strong> 8 966 строк против 8 803 уникальных заказов.
+          Любая метрика «на заказ» обязана дедуплицировать по <span class="mono">order_id</span>.
+          Формулы и <span class="mono">file:line</span> — в <span class="mono">docs/metric-definitions.md</span>.
+        </div>
+      </div>
+      <div class="footer"><span>Приложение</span><span class="r">docs/metric-definitions.md · CONTEXT.md · reports/business.json</span></div>
+    </div>
+  </section>
+
+</div>
+<div id="counter" aria-hidden="true">01 / 16</div>
+<div class="hint" aria-hidden="true">← → / PageUp PageDown / прокрутка</div>
+<script>
+(function () {
+  var deck = document.getElementById('deck');
+  var slides = Array.prototype.slice.call(deck.querySelectorAll('.slide'));
+  var counter = document.getElementById('counter');
+  var total = slides.length;
+  var idx = 0;
+  var ticking = false;
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function setCounter(i) {
+    idx = i;
+    counter.textContent = pad(i + 1) + ' / ' + pad(total);
+  }
+  function go(i) {
+    i = Math.max(0, Math.min(total - 1, i));
+    slides[i].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+    setCounter(i);
+  }
+
+  deck.addEventListener('scroll', function () {
+    if (ticking) return;
+    ticking = true;
+    window.requestAnimationFrame(function () {
+      var step = deck.clientWidth || 1;
+      var i = Math.round(deck.scrollLeft / step);
+      setCounter(Math.max(0, Math.min(total - 1, i)));
+      ticking = false;
+    });
+  }, { passive: true });
+
+  window.addEventListener('keydown', function (e) {
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'PageDown' || k === ' ') {
+      e.preventDefault(); go(idx + 1);
+    } else if (k === 'ArrowLeft' || k === 'PageUp') {
+      e.preventDefault(); go(idx - 1);
+    } else if (k === 'Home') {
+      e.preventDefault(); go(0);
+    } else if (k === 'End') {
+      e.preventDefault(); go(total - 1);
+    }
+  });
+
+  deck.addEventListener('wheel', function (e) {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      e.preventDefault();
+      deck.scrollLeft += e.deltaY;
+    }
+  }, { passive: false });
+
+  var hashN = parseInt((window.location.hash || '').replace('#', ''), 10);
+  if (hashN >= 1 && hashN <= total) {
+    window.requestAnimationFrame(function () {
+      deck.style.scrollBehavior = 'auto';
+      deck.scrollLeft = (hashN - 1) * deck.clientWidth;
+      setCounter(hashN - 1);
+      deck.style.scrollBehavior = '';
+    });
+  } else {
+    setCounter(0);
+  }
+})();
+</script>
+</body>
+</html>
