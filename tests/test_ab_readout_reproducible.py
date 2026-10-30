@@ -54,7 +54,9 @@ def test_every_stored_number_reproduces(stored: dict, fresh: dict) -> None:
     """28 stored values, each within 1e-6 relative of the recomputed one."""
     rows = verifier.comparisons(stored, fresh)
     failed = [row for row in rows if row[3] == "FAIL"]
-    assert not failed, "\n".join(f"{lbl}: stored {old:g} vs fresh {new:g}" for lbl, old, new, _ in failed)
+    assert not failed, "\n".join(
+        f"{lbl}: stored {old:g} vs fresh {new:g}" for lbl, old, new, _ in failed
+    )
     # A silently dropped comparison would keep this test green; pin the coverage.
     assert len(rows) >= 28
 
